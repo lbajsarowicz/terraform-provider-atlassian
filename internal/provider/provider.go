@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -66,18 +65,17 @@ func (p *AtlassianProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	url := os.Getenv("ATLASSIAN_URL")
-	if !config.URL.IsNull() {
+	// Pass values to client - empty string triggers env var fallback in NewClient
+	url := ""
+	if !config.URL.IsNull() && !config.URL.IsUnknown() {
 		url = config.URL.ValueString()
 	}
-
-	user := os.Getenv("ATLASSIAN_USER")
-	if !config.User.IsNull() {
+	user := ""
+	if !config.User.IsNull() && !config.User.IsUnknown() {
 		user = config.User.ValueString()
 	}
-
-	token := os.Getenv("ATLASSIAN_TOKEN")
-	if !config.Token.IsNull() {
+	token := ""
+	if !config.Token.IsNull() && !config.Token.IsUnknown() {
 		token = config.Token.ValueString()
 	}
 
