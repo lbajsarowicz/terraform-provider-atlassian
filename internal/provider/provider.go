@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/lbajsarowicz/terraform-provider-atlassian/internal/atlassian"
+	"github.com/lbajsarowicz/terraform-provider-atlassian/internal/jira"
 )
 
 var _ provider.Provider = &AtlassianProvider{}
@@ -94,7 +95,9 @@ func (p *AtlassianProvider) Configure(ctx context.Context, req provider.Configur
 }
 
 func (p *AtlassianProvider) Resources(_ context.Context) []func() resource.Resource {
-	return []func() resource.Resource{}
+	return []func() resource.Resource{
+		jira.NewProjectResource,
+	}
 }
 
 func (p *AtlassianProvider) DataSources(_ context.Context) []func() datasource.DataSource {
