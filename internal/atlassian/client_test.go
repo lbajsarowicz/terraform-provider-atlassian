@@ -4,7 +4,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"sync/atomic"
 	"testing"
 )
@@ -51,10 +50,10 @@ func TestNewClientExplicitOverridesEnv(t *testing.T) {
 }
 
 func TestNewClientMissingCredentials(t *testing.T) {
-	// Clear env vars
-	os.Unsetenv("ATLASSIAN_URL")
-	os.Unsetenv("ATLASSIAN_USER")
-	os.Unsetenv("ATLASSIAN_TOKEN")
+	// Clear env vars (t.Setenv auto-restores after test)
+	t.Setenv("ATLASSIAN_URL", "")
+	t.Setenv("ATLASSIAN_USER", "")
+	t.Setenv("ATLASSIAN_TOKEN", "")
 
 	_, err := NewClient(ClientConfig{})
 	if err == nil {
