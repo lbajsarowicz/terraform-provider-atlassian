@@ -298,6 +298,27 @@ func (c *Client) Delete(ctx context.Context, path string) error {
 	return nil
 }
 
+// DeleteWithStatus performs a DELETE request and returns the HTTP status code.
+// On 404, returns (404, nil) — the caller decides how to handle it.
+func (c *Client) DeleteWithStatus(ctx context.Context, path string) (int, error) {
+	resp, err := c.Do(ctx, "DELETE", path, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return http.StatusNotFound, nil
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, fmt.Errorf("DELETE %s: unexpected status %d: %s", path, resp.StatusCode, string(bodyBytes))
+	}
+
+	return resp.StatusCode, nil
+}
+
 // parseRetryAfter parses the Retry-After header value as seconds.
 // Returns baseDelay if the header cannot be parsed.
 func parseRetryAfter(header string) time.Duration {
