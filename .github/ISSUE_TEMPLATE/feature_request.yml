@@ -1,0 +1,41 @@
+name: Feature Request
+description: Request a new resource, data source, or enhancement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: Resource Type
+      description: What type of resource are you requesting?
+      options:
+        - Jira Resource
+        - Jira Data Source
+        - Confluence Resource
+        - Confluence Data Source
+        - Provider Enhancement
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: api-endpoint
+    attributes:
+      label: Jira/Confluence API Endpoint
+      description: The REST API endpoint this would use (if known).
+      placeholder: "/rest/api/3/project"
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Describe the use case for this feature. Why do you need it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Proposed Configuration
+      description: How you would expect the HCL configuration to look.
+      render: hcl
