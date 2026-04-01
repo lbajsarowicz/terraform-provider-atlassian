@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/lbajsarowicz/terraform-provider-atlassian/internal/atlassian"
 	"github.com/lbajsarowicz/terraform-provider-atlassian/internal/jira"
+	"github.com/lbajsarowicz/terraform-provider-atlassian/internal/jira"
 )
 
 var _ provider.Provider = &AtlassianProvider{}
