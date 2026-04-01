@@ -2,17 +2,25 @@ package jira_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/lbajsarowicz/terraform-provider-atlassian/internal/testutil"
 )
 
 func TestAccGroupResource_basic(t *testing.T) {
+	groupName := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
+
+	var mu sync.Mutex
+	createdGroup := map[string]string{}
+
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == "POST" && r.URL.Path == "/rest/api/3/group":
@@ -21,6 +29,10 @@ func TestAccGroupResource_basic(t *testing.T) {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
+			mu.Lock()
+			createdGroup["groupId"] = "test-group-id-123"
+			createdGroup["name"] = body["name"]
+			mu.Unlock()
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(map[string]string{
@@ -29,25 +41,31 @@ func TestAccGroupResource_basic(t *testing.T) {
 			})
 		case r.Method == "GET" && r.URL.Path == "/rest/api/3/group":
 			groupID := r.URL.Query().Get("groupId")
-			groupName := r.URL.Query().Get("groupname")
-			if groupID == "test-group-id-123" {
+			groupQName := r.URL.Query().Get("groupname")
+			mu.Lock()
+			g := make(map[string]string)
+			for k, v := range createdGroup {
+				g[k] = v
+			}
+			mu.Unlock()
+			if groupID == g["groupId"] {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(g)
+			} else if groupQName != "" {
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(map[string]string{
-					"groupId": "test-group-id-123",
-					"name":    "tf-test-group",
-				})
-			} else if groupName != "" {
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]string{
-					"groupId": "test-group-id-123",
-					"name":    groupName,
+					"groupId": g["groupId"],
+					"name":    groupQName,
 				})
 			} else {
 				w.WriteHeader(http.StatusNotFound)
 			}
 		case r.Method == "DELETE" && r.URL.Path == "/rest/api/3/group":
 			groupID := r.URL.Query().Get("groupId")
-			if groupID == "test-group-id-123" {
+			mu.Lock()
+			gID := createdGroup["groupId"]
+			mu.Unlock()
+			if groupID == gID {
 				w.WriteHeader(http.StatusNoContent)
 			} else {
 				w.WriteHeader(http.StatusNotFound)
@@ -70,9 +88,9 @@ func TestAccGroupResource_basic(t *testing.T) {
 		},
 		Steps: []resource.TestStep{
 			{
-				Config: `resource "atlassian_jira_group" "test" { name = "tf-test-group" }`,
+				Config: fmt.Sprintf(`resource "atlassian_jira_group" "test" { name = %q }`, groupName),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("atlassian_jira_group.test", "name", "tf-test-group"),
+					resource.TestCheckResourceAttr("atlassian_jira_group.test", "name", groupName),
 					resource.TestCheckResourceAttr("atlassian_jira_group.test", "group_id", "test-group-id-123"),
 				),
 			},
@@ -81,6 +99,8 @@ func TestAccGroupResource_basic(t *testing.T) {
 }
 
 func TestAccGroupResource_Read_NotFound(t *testing.T) {
+	groupName := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
+
 	var callCount atomic.Int32
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -89,7 +109,7 @@ func TestAccGroupResource_Read_NotFound(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(map[string]string{
 				"groupId": "test-group-id-456",
-				"name":    "tf-test-vanishing-group",
+				"name":    groupName,
 			})
 		case r.Method == "GET" && r.URL.Path == "/rest/api/3/group":
 			groupID := r.URL.Query().Get("groupId")
@@ -103,7 +123,7 @@ func TestAccGroupResource_Read_NotFound(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(map[string]string{
 					"groupId": "test-group-id-456",
-					"name":    "tf-test-vanishing-group",
+					"name":    groupName,
 				})
 			} else {
 				// Subsequent reads return 404 (deleted out-of-band)
@@ -129,14 +149,14 @@ func TestAccGroupResource_Read_NotFound(t *testing.T) {
 		},
 		Steps: []resource.TestStep{
 			{
-				Config: `resource "atlassian_jira_group" "test" { name = "tf-test-vanishing-group" }`,
+				Config: fmt.Sprintf(`resource "atlassian_jira_group" "test" { name = %q }`, groupName),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("atlassian_jira_group.test", "name", "tf-test-vanishing-group"),
+					resource.TestCheckResourceAttr("atlassian_jira_group.test", "name", groupName),
 				),
 			},
 			// Second step: Read will 404 -> resource removed from state -> plan shows recreation
 			{
-				Config:             `resource "atlassian_jira_group" "test" { name = "tf-test-vanishing-group" }`,
+				Config:             fmt.Sprintf(`resource "atlassian_jira_group" "test" { name = %q }`, groupName),
 				ExpectNonEmptyPlan: true,
 			},
 		},
@@ -144,29 +164,44 @@ func TestAccGroupResource_Read_NotFound(t *testing.T) {
 }
 
 func TestAccGroupResource_Import(t *testing.T) {
+	groupName := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
+
+	var mu sync.Mutex
+	createdGroup := map[string]string{}
+
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == "POST" && r.URL.Path == "/rest/api/3/group":
+			mu.Lock()
+			createdGroup["groupId"] = "imported-group-id"
+			createdGroup["name"] = groupName
+			mu.Unlock()
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(map[string]string{
 				"groupId": "imported-group-id",
-				"name":    "tf-test-import-group",
+				"name":    groupName,
 			})
 		case r.Method == "GET" && r.URL.Path == "/rest/api/3/group":
 			groupID := r.URL.Query().Get("groupId")
-			groupName := r.URL.Query().Get("groupname")
+			groupQName := r.URL.Query().Get("groupname")
+			mu.Lock()
+			g := make(map[string]string)
+			for k, v := range createdGroup {
+				g[k] = v
+			}
+			mu.Unlock()
 			if groupID == "imported-group-id" {
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(map[string]string{
 					"groupId": "imported-group-id",
-					"name":    "tf-test-import-group",
+					"name":    g["name"],
 				})
-			} else if groupName == "tf-test-import-group" {
+			} else if groupQName == g["name"] {
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(map[string]string{
 					"groupId": "imported-group-id",
-					"name":    "tf-test-import-group",
+					"name":    g["name"],
 				})
 			} else {
 				w.WriteHeader(http.StatusNotFound)
@@ -196,12 +231,12 @@ func TestAccGroupResource_Import(t *testing.T) {
 		},
 		Steps: []resource.TestStep{
 			{
-				Config: `resource "atlassian_jira_group" "test" { name = "tf-test-import-group" }`,
+				Config: fmt.Sprintf(`resource "atlassian_jira_group" "test" { name = %q }`, groupName),
 			},
 			{
 				ResourceName:                         "atlassian_jira_group.test",
 				ImportState:                          true,
-				ImportStateId:                        "tf-test-import-group",
+				ImportStateId:                        groupName,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "group_id",
 			},
