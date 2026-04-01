@@ -1,6 +1,7 @@
 package atlassian
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -121,7 +122,7 @@ func TestNewRequestSetsHeaders(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	req, err := client.newRequest("GET", "/test", nil)
+	req, err := client.newRequest(context.Background(), "GET", "/test", nil)
 	if err != nil {
 		t.Fatalf("unexpected error creating request: %s", err)
 	}
@@ -158,7 +159,7 @@ func TestRateLimitRetry(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	resp, err := client.Do("GET", "/test", nil)
+	resp, err := client.Do(context.Background(), "GET", "/test", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -202,7 +203,7 @@ func TestRetryPreservesPostBody(t *testing.T) {
 	}
 
 	body := []byte(`{"name":"test-project"}`)
-	resp, err := client.Do("POST", "/test", body)
+	resp, err := client.Do(context.Background(), "POST", "/test", body)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -254,7 +255,7 @@ func TestGetWithStatus404(t *testing.T) {
 	}
 
 	var result map[string]interface{}
-	status, err := client.GetWithStatus("/not-found", &result)
+	status, err := client.GetWithStatus(context.Background(), "/not-found", &result)
 	if err != nil {
 		t.Fatalf("expected nil error for 404, got: %s", err)
 	}

@@ -2,6 +2,7 @@ package atlassian
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -73,7 +74,7 @@ func NewClient(config ClientConfig) (*Client, error) {
 		user:       user,
 		token:      token,
 		version:    config.Version,
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: 30 * time.Second},
 	}, nil
 }
 
@@ -88,15 +89,15 @@ func QueryEscape(s string) string {
 }
 
 // newRequest creates a new HTTP request with authentication and standard headers.
-func (c *Client) newRequest(method, path string, body *bytes.Reader) (*http.Request, error) {
+func (c *Client) newRequest(ctx context.Context, method, path string, body *bytes.Reader) (*http.Request, error) {
 	u := c.baseURL + path
 
 	var req *http.Request
 	var err error
 	if body != nil {
-		req, err = http.NewRequest(method, u, body)
+		req, err = http.NewRequestWithContext(ctx, method, u, body)
 	} else {
-		req, err = http.NewRequest(method, u, nil)
+		req, err = http.NewRequestWithContext(ctx, method, u, nil)
 	}
 	if err != nil {
 		return nil, err
@@ -115,7 +116,7 @@ func (c *Client) newRequest(method, path string, body *bytes.Reader) (*http.Requ
 
 // Do executes an HTTP request with retry logic for rate limits and server errors.
 // The body parameter uses bytes.NewReader so it can be replayed on retries.
-func (c *Client) Do(method, path string, body []byte) (*http.Response, error) {
+func (c *Client) Do(ctx context.Context, method, path string, body []byte) (*http.Response, error) {
 	var bodyReader *bytes.Reader
 	if body != nil {
 		bodyReader = bytes.NewReader(body)
@@ -127,7 +128,7 @@ func (c *Client) Do(method, path string, body []byte) (*http.Response, error) {
 			bodyReader.Seek(0, io.SeekStart)
 		}
 
-		req, err := c.newRequest(method, path, bodyReader)
+		req, err := c.newRequest(ctx, method, path, bodyReader)
 		if err != nil {
 			return nil, fmt.Errorf("creating request: %w", err)
 		}
@@ -166,8 +167,8 @@ func (c *Client) Do(method, path string, body []byte) (*http.Response, error) {
 }
 
 // Get performs a GET request and decodes the JSON response into v.
-func (c *Client) Get(path string, v interface{}) error {
-	resp, err := c.Do("GET", path, nil)
+func (c *Client) Get(ctx context.Context, path string, v interface{}) error {
+	resp, err := c.Do(ctx, "GET", path, nil)
 	if err != nil {
 		return err
 	}
@@ -183,8 +184,8 @@ func (c *Client) Get(path string, v interface{}) error {
 
 // GetWithStatus performs a GET request and returns the status code.
 // On 404, returns (404, nil) — the caller decides whether to remove state.
-func (c *Client) GetWithStatus(path string, v interface{}) (int, error) {
-	resp, err := c.Do("GET", path, nil)
+func (c *Client) GetWithStatus(ctx context.Context, path string, v interface{}) (int, error) {
+	resp, err := c.Do(ctx, "GET", path, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -207,13 +208,13 @@ func (c *Client) GetWithStatus(path string, v interface{}) (int, error) {
 }
 
 // Post performs a POST request with a JSON body and decodes the response into v.
-func (c *Client) Post(path string, body interface{}, v interface{}) error {
+func (c *Client) Post(ctx context.Context, path string, body interface{}, v interface{}) error {
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return fmt.Errorf("marshaling request body: %w", err)
 	}
 
-	resp, err := c.Do("POST", path, jsonBody)
+	resp, err := c.Do(ctx, "POST", path, jsonBody)
 	if err != nil {
 		return err
 	}
@@ -232,13 +233,13 @@ func (c *Client) Post(path string, body interface{}, v interface{}) error {
 }
 
 // Put performs a PUT request with a JSON body and decodes the response into v.
-func (c *Client) Put(path string, body interface{}, v interface{}) error {
+func (c *Client) Put(ctx context.Context, path string, body interface{}, v interface{}) error {
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return fmt.Errorf("marshaling request body: %w", err)
 	}
 
-	resp, err := c.Do("PUT", path, jsonBody)
+	resp, err := c.Do(ctx, "PUT", path, jsonBody)
 	if err != nil {
 		return err
 	}
@@ -257,13 +258,13 @@ func (c *Client) Put(path string, body interface{}, v interface{}) error {
 }
 
 // Patch performs a PATCH request with a JSON body and decodes the response into v.
-func (c *Client) Patch(path string, body interface{}, v interface{}) error {
+func (c *Client) Patch(ctx context.Context, path string, body interface{}, v interface{}) error {
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return fmt.Errorf("marshaling request body: %w", err)
 	}
 
-	resp, err := c.Do("PATCH", path, jsonBody)
+	resp, err := c.Do(ctx, "PATCH", path, jsonBody)
 	if err != nil {
 		return err
 	}
@@ -282,8 +283,8 @@ func (c *Client) Patch(path string, body interface{}, v interface{}) error {
 }
 
 // Delete performs a DELETE request.
-func (c *Client) Delete(path string) error {
-	resp, err := c.Do("DELETE", path, nil)
+func (c *Client) Delete(ctx context.Context, path string) error {
+	resp, err := c.Do(ctx, "DELETE", path, nil)
 	if err != nil {
 		return err
 	}
