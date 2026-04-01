@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,9 +16,9 @@ import (
 )
 
 const (
-	maxRetries = 5
-	baseDelay  = 1 * time.Second
-	maxDelay   = 30 * time.Second
+	maxRetries    = 5
+	baseDelay     = 1 * time.Second
+	maxRetryDelay = 30 * time.Second
 )
 
 // Client is the Atlassian Cloud API client.
@@ -311,11 +312,14 @@ func parseRetryAfter(header string) time.Duration {
 	return time.Duration(seconds) * time.Second
 }
 
-// exponentialBackoff calculates the delay for a given retry attempt.
+// exponentialBackoff calculates the delay for a given retry attempt with jitter
+// to prevent thundering herd on rate limits.
 func exponentialBackoff(attempt int) time.Duration {
 	delay := time.Duration(math.Pow(2, float64(attempt))) * baseDelay
-	if delay > maxDelay {
-		delay = maxDelay
+	jitter := 0.5 + rand.Float64()*0.5 // 0.5 to 1.0
+	delay = time.Duration(float64(delay) * 2 * jitter)
+	if delay > maxRetryDelay {
+		delay = maxRetryDelay
 	}
 	return delay
 }
