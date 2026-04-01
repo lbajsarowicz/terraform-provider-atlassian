@@ -20,7 +20,7 @@ type PageResponse struct {
 // The path should be the API path without pagination query parameters.
 // Results are returned as raw JSON messages that the caller can unmarshal.
 func (c *Client) GetAllPages(ctx context.Context, path string) ([]json.RawMessage, error) {
-	var allValues []json.RawMessage
+	allValues := make([]json.RawMessage, 0)
 	startAt := 0
 	maxResults := 50
 

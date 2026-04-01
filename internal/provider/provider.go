@@ -47,7 +47,6 @@ func (p *AtlassianProvider) Schema(_ context.Context, _ provider.SchemaRequest, 
 			"user": schema.StringAttribute{
 				Description: "Atlassian account email for API authentication. Falls back to ATLASSIAN_USER env var.",
 				Optional:    true,
-				Sensitive:   true,
 			},
 			"token": schema.StringAttribute{
 				Description: "Atlassian API token for authentication. Falls back to ATLASSIAN_TOKEN env var.",
