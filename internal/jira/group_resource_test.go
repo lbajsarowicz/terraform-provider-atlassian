@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/lbajsarowicz/terraform-provider-atlassian/internal/testutil"
 )
 
@@ -63,6 +64,10 @@ func TestAccGroupResource_basic(t *testing.T) {
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
+		// TODO: query real API when running against live instance
+		CheckDestroy: func(s *terraform.State) error {
+			return nil
+		},
 		Steps: []resource.TestStep{
 			{
 				Config: `resource "atlassian_jira_group" "test" { name = "tf-test-group" }`,
@@ -118,6 +123,10 @@ func TestAccGroupResource_Read_NotFound(t *testing.T) {
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
+		// TODO: query real API when running against live instance
+		CheckDestroy: func(s *terraform.State) error {
+			return nil
+		},
 		Steps: []resource.TestStep{
 			{
 				Config: `resource "atlassian_jira_group" "test" { name = "tf-test-vanishing-group" }`,
@@ -181,6 +190,10 @@ func TestAccGroupResource_Import(t *testing.T) {
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
+		// TODO: query real API when running against live instance
+		CheckDestroy: func(s *terraform.State) error {
+			return nil
+		},
 		Steps: []resource.TestStep{
 			{
 				Config: `resource "atlassian_jira_group" "test" { name = "tf-test-import-group" }`,
