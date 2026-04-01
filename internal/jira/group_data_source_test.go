@@ -14,11 +14,16 @@ import (
 func TestAccGroupDataSource_basic(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" && r.URL.Path == "/rest/api/3/group" {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{
-				"groupId": "ds-group-id-789",
-				"name":    "tf-test-ds-group",
-			})
+			groupName := r.URL.Query().Get("groupname")
+			if groupName == "tf-test-ds-group" {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]string{
+					"groupId": "ds-group-id-789",
+					"name":    groupName,
+				})
+				return
+			}
+			w.WriteHeader(http.StatusNotFound)
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -45,6 +50,13 @@ func TestAccGroupDataSource_basic(t *testing.T) {
 
 func TestAccGroupDataSource_NotFound(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" && r.URL.Path == "/rest/api/3/group" {
+			groupName := r.URL.Query().Get("groupname")
+			if groupName == "nonexistent-group" {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+		}
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer mockServer.Close()

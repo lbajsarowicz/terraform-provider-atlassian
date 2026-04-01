@@ -14,20 +14,42 @@ func TestAccGroupResource_basic(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == "POST" && r.URL.Path == "/rest/api/3/group":
+			var body map[string]string
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(map[string]string{
 				"groupId": "test-group-id-123",
-				"name":    "tf-test-group",
+				"name":    body["name"],
 			})
 		case r.Method == "GET" && r.URL.Path == "/rest/api/3/group":
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{
-				"groupId": "test-group-id-123",
-				"name":    "tf-test-group",
-			})
+			groupID := r.URL.Query().Get("groupId")
+			groupName := r.URL.Query().Get("groupname")
+			if groupID == "test-group-id-123" {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]string{
+					"groupId": "test-group-id-123",
+					"name":    "tf-test-group",
+				})
+			} else if groupName != "" {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]string{
+					"groupId": "test-group-id-123",
+					"name":    groupName,
+				})
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
 		case r.Method == "DELETE" && r.URL.Path == "/rest/api/3/group":
-			w.WriteHeader(http.StatusNoContent)
+			groupID := r.URL.Query().Get("groupId")
+			if groupID == "test-group-id-123" {
+				w.WriteHeader(http.StatusNoContent)
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -64,6 +86,11 @@ func TestAccGroupResource_Read_NotFound(t *testing.T) {
 				"name":    "tf-test-vanishing-group",
 			})
 		case r.Method == "GET" && r.URL.Path == "/rest/api/3/group":
+			groupID := r.URL.Query().Get("groupId")
+			if groupID != "test-group-id-456" {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
 			callCount++
 			if callCount <= 1 {
 				// First read after create succeeds
@@ -117,14 +144,30 @@ func TestAccGroupResource_Import(t *testing.T) {
 				"name":    "tf-test-import-group",
 			})
 		case r.Method == "GET" && r.URL.Path == "/rest/api/3/group":
-			// Respond to both groupId and groupname queries
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{
-				"groupId": "imported-group-id",
-				"name":    "tf-test-import-group",
-			})
+			groupID := r.URL.Query().Get("groupId")
+			groupName := r.URL.Query().Get("groupname")
+			if groupID == "imported-group-id" {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]string{
+					"groupId": "imported-group-id",
+					"name":    "tf-test-import-group",
+				})
+			} else if groupName == "tf-test-import-group" {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]string{
+					"groupId": "imported-group-id",
+					"name":    "tf-test-import-group",
+				})
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
 		case r.Method == "DELETE" && r.URL.Path == "/rest/api/3/group":
-			w.WriteHeader(http.StatusNoContent)
+			groupID := r.URL.Query().Get("groupId")
+			if groupID == "imported-group-id" {
+				w.WriteHeader(http.StatusNoContent)
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
