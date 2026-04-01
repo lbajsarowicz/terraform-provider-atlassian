@@ -1,9 +1,11 @@
 package atlassian
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync/atomic"
 	"testing"
 )
 
@@ -88,7 +90,6 @@ func TestNewClientTrimsTrailingSlash(t *testing.T) {
 
 func TestNewRequestSetsHeaders(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verify headers
 		if r.Header.Get("User-Agent") != "terraform-provider-atlassian/1.0.0" {
 			t.Errorf("unexpected User-Agent: %s", r.Header.Get("User-Agent"))
 		}
@@ -131,4 +132,134 @@ func TestNewRequestSetsHeaders(t *testing.T) {
 		t.Fatalf("unexpected error doing request: %s", err)
 	}
 	defer resp.Body.Close()
+}
+
+func TestRateLimitRetry(t *testing.T) {
+	var attempts atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempt := attempts.Add(1)
+		if attempt == 1 {
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"ok": true}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientConfig{
+		URL:     server.URL,
+		User:    "user@example.com",
+		Token:   "token",
+		Version: "test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	resp, err := client.Do("GET", "/test", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	defer resp.Body.Close()
+
+	if attempts.Load() != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts.Load())
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestRetryPreservesPostBody(t *testing.T) {
+	var bodies []string
+	var attempts atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(bodyBytes))
+
+		attempt := attempts.Add(1)
+		if attempt == 1 {
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"ok": true}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientConfig{
+		URL:     server.URL,
+		User:    "user@example.com",
+		Token:   "token",
+		Version: "test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	body := []byte(`{"name":"test-project"}`)
+	resp, err := client.Do("POST", "/test", body)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	defer resp.Body.Close()
+
+	if len(bodies) != 2 {
+		t.Fatalf("expected 2 attempts, got %d", len(bodies))
+	}
+	if bodies[0] != bodies[1] {
+		t.Errorf("body not preserved across retries: %q vs %q", bodies[0], bodies[1])
+	}
+	if bodies[0] != `{"name":"test-project"}` {
+		t.Errorf("unexpected body: %s", bodies[0])
+	}
+}
+
+func TestQueryEscape(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"hello world", "hello+world"},
+		{"foo@bar.com", "foo%40bar.com"},
+		{"simple", "simple"},
+	}
+
+	for _, tt := range tests {
+		result := QueryEscape(tt.input)
+		if result != tt.expected {
+			t.Errorf("QueryEscape(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestGetWithStatus404(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientConfig{
+		URL:     server.URL,
+		User:    "user@example.com",
+		Token:   "token",
+		Version: "test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	var result map[string]interface{}
+	status, err := client.GetWithStatus("/not-found", &result)
+	if err != nil {
+		t.Fatalf("expected nil error for 404, got: %s", err)
+	}
+	if status != 404 {
+		t.Errorf("expected status 404, got %d", status)
+	}
 }
