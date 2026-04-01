@@ -101,5 +101,7 @@ func (p *AtlassianProvider) Resources(_ context.Context) []func() resource.Resou
 }
 
 func (p *AtlassianProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		jira.NewGroupDataSource,
+	}
 }
