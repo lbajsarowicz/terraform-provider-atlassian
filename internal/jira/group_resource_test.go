@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -75,7 +76,7 @@ func TestAccGroupResource_basic(t *testing.T) {
 }
 
 func TestAccGroupResource_Read_NotFound(t *testing.T) {
-	callCount := 0
+	var callCount atomic.Int32
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == "POST" && r.URL.Path == "/rest/api/3/group":
@@ -91,8 +92,8 @@ func TestAccGroupResource_Read_NotFound(t *testing.T) {
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
-			callCount++
-			if callCount <= 1 {
+			callCount.Add(1)
+			if callCount.Load() <= 1 {
 				// First read after create succeeds
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(map[string]string{
