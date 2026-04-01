@@ -1,6 +1,7 @@
 package atlassian
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -18,7 +19,7 @@ type PageResponse struct {
 // GetAllPages fetches all pages from a Jira paginated endpoint.
 // The path should be the API path without pagination query parameters.
 // Results are returned as raw JSON messages that the caller can unmarshal.
-func (c *Client) GetAllPages(path string) ([]json.RawMessage, error) {
+func (c *Client) GetAllPages(ctx context.Context, path string) ([]json.RawMessage, error) {
 	var allValues []json.RawMessage
 	startAt := 0
 	maxResults := 50
@@ -32,7 +33,7 @@ func (c *Client) GetAllPages(path string) ([]json.RawMessage, error) {
 		paginatedPath := fmt.Sprintf("%s%sstartAt=%d&maxResults=%d", path, separator, startAt, maxResults)
 
 		var page PageResponse
-		if err := c.Get(paginatedPath, &page); err != nil {
+		if err := c.Get(ctx, paginatedPath, &page); err != nil {
 			return nil, fmt.Errorf("fetching page at startAt=%d: %w", startAt, err)
 		}
 

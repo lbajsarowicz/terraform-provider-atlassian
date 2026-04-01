@@ -1,6 +1,7 @@
 package atlassian
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -59,7 +60,7 @@ func TestGetAllPagesMultiplePages(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	results, err := client.GetAllPages("/rest/api/3/items")
+	results, err := client.GetAllPages(context.Background(), "/rest/api/3/items")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -104,7 +105,7 @@ func TestGetAllPagesSinglePage(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	results, err := client.GetAllPages("/rest/api/3/items")
+	results, err := client.GetAllPages(context.Background(), "/rest/api/3/items")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -151,7 +152,7 @@ func TestGetAllPagesWithExistingQueryParams(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	results, err := client.GetAllPages("/rest/api/3/items?projectId=10001")
+	results, err := client.GetAllPages(context.Background(), "/rest/api/3/items?projectId=10001")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
