@@ -148,9 +148,14 @@ func (r *groupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	}
 
 	path := fmt.Sprintf("/rest/api/3/group?groupId=%s", atlassian.QueryEscape(state.GroupID.ValueString()))
-	err := r.client.Delete(ctx, path)
+	statusCode, err := r.client.DeleteWithStatus(ctx, path)
 	if err != nil {
 		resp.Diagnostics.AddError("Error deleting group", err.Error())
+		return
+	}
+
+	// 404 means the group was already deleted out-of-band; treat as success.
+	if statusCode == http.StatusNotFound {
 		return
 	}
 }
