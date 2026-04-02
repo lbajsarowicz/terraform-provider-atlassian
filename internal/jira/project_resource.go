@@ -248,9 +248,14 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 
 	apiPath := fmt.Sprintf("/rest/api/3/project/%s", atlassian.QueryEscape(state.Key.ValueString()))
-	err := r.client.Delete(ctx, apiPath)
+	statusCode, err := r.client.DeleteWithStatus(ctx, apiPath)
 	if err != nil {
 		resp.Diagnostics.AddError("Error deleting project", err.Error())
+		return
+	}
+
+	// 404 means the project was already deleted out-of-band; treat as success.
+	if statusCode == http.StatusNotFound {
 		return
 	}
 }
