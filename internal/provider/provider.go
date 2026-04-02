@@ -114,6 +114,7 @@ func (p *AtlassianProvider) Resources(_ context.Context) []func() resource.Resou
 		jira.NewScreenResource,
 		jira.NewScreenTabResource,
 		jira.NewScreenTabFieldResource,
+		jira.NewScreenSchemeResource,
 	}
 }
 
@@ -130,5 +131,6 @@ func (p *AtlassianProvider) DataSources(_ context.Context) []func() datasource.D
 		jira.NewWorkflowDataSource,
 		jira.NewWorkflowSchemeDataSource,
 		jira.NewScreenDataSource,
+		jira.NewScreenSchemeDataSource,
 	}
 }
