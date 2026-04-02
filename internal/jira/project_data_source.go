@@ -87,7 +87,7 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	}
 
 	var result jiraProjectAPIResponse
-	apiPath := fmt.Sprintf("/rest/api/3/project/%s", atlassian.QueryEscape(config.Key.ValueString()))
+	apiPath := fmt.Sprintf("/rest/api/3/project/%s", atlassian.PathEscape(config.Key.ValueString()))
 	statusCode, err := d.client.GetWithStatus(ctx, apiPath, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading project", err.Error())
