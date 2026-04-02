@@ -348,3 +348,83 @@ func TestAccIssueTypeResource_Import(t *testing.T) {
 		},
 	})
 }
+
+func TestAccIssueTypeResource_ImportSubtask(t *testing.T) {
+	name := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
+	state := &issueTypeState{}
+
+	mockServer := newIssueTypeMockServer(state, nil)
+	defer mockServer.Close()
+
+	t.Setenv("ATLASSIAN_URL", mockServer.URL)
+	t.Setenv("ATLASSIAN_USER", "test@test.com")
+	t.Setenv("ATLASSIAN_TOKEN", "test-token")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
+		CheckDestroy: func(s *terraform.State) error {
+			return nil
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`resource "atlassian_jira_issue_type" "test" {
+  name = %q
+  type = "subtask"
+}`, name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("atlassian_jira_issue_type.test", "type", "subtask"),
+					resource.TestCheckResourceAttr("atlassian_jira_issue_type.test", "hierarchy_level", "-1"),
+				),
+			},
+			{
+				ResourceName:      "atlassian_jira_issue_type.test",
+				ImportState:       true,
+				ImportStateId:     "10001",
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func TestAccIssueTypeResource_AvatarID(t *testing.T) {
+	name := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
+	state := &issueTypeState{}
+
+	mockServer := newIssueTypeMockServer(state, nil)
+	defer mockServer.Close()
+
+	t.Setenv("ATLASSIAN_URL", mockServer.URL)
+	t.Setenv("ATLASSIAN_USER", "test@test.com")
+	t.Setenv("ATLASSIAN_TOKEN", "test-token")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
+		CheckDestroy: func(s *terraform.State) error {
+			return nil
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`resource "atlassian_jira_issue_type" "test" {
+  name      = %q
+  type      = "standard"
+  avatar_id = 10300
+}`, name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("atlassian_jira_issue_type.test", "name", name),
+					resource.TestCheckResourceAttr("atlassian_jira_issue_type.test", "type", "standard"),
+					resource.TestCheckResourceAttr("atlassian_jira_issue_type.test", "avatar_id", "10300"),
+				),
+			},
+			{
+				Config: fmt.Sprintf(`resource "atlassian_jira_issue_type" "test" {
+  name      = %q
+  type      = "standard"
+  avatar_id = 10300
+}`, name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("atlassian_jira_issue_type.test", "avatar_id", "10300"),
+				),
+			},
+		},
+	})
+}
