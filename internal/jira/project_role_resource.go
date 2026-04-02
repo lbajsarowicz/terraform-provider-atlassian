@@ -109,8 +109,7 @@ func (r *projectRoleResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	plan.ID = types.StringValue(fmt.Sprintf("%d", result.ID))
-	plan.Name = types.StringValue(result.Name)
-	plan.Description = types.StringValue(result.Description)
+	// plan.Name and plan.Description preserved from plan
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -169,8 +168,7 @@ func (r *projectRoleResource) Update(ctx context.Context, req resource.UpdateReq
 	}
 
 	plan.ID = state.ID
-	plan.Name = types.StringValue(result.Name)
-	plan.Description = types.StringValue(result.Description)
+	// plan.Name and plan.Description preserved from plan
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
