@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -189,13 +190,19 @@ func (r *projectPermissionSchemeResource) ImportState(ctx context.Context, req r
 func (r *projectPermissionSchemeResource) assignScheme(ctx context.Context, projectKey, schemeID string) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	body := map[string]string{
-		"id": schemeID,
+	idInt, err := strconv.Atoi(schemeID)
+	if err != nil {
+		diags.AddError("Invalid scheme ID", fmt.Sprintf("scheme_id %q is not a valid integer", schemeID))
+		return diags
+	}
+
+	body := map[string]int{
+		"id": idInt,
 	}
 
 	var result projectPermissionSchemeAPIResponse
 	apiPath := fmt.Sprintf("/rest/api/3/project/%s/permissionscheme", atlassian.PathEscape(projectKey))
-	err := r.client.Put(ctx, apiPath, body, &result)
+	err = r.client.Put(ctx, apiPath, body, &result)
 	if err != nil {
 		diags.AddError("Error assigning permission scheme to project", err.Error())
 	}
