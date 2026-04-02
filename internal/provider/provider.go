@@ -107,6 +107,7 @@ func (p *AtlassianProvider) Resources(_ context.Context) []func() resource.Resou
 		jira.NewCustomFieldResource,
 		jira.NewIssueTypeSchemeResource,
 		jira.NewProjectIssueTypeSchemeResource,
+		jira.NewStatusResource,
 	}
 }
 
@@ -119,5 +120,6 @@ func (p *AtlassianProvider) DataSources(_ context.Context) []func() datasource.D
 		jira.NewProjectRoleDataSource,
 		jira.NewCustomFieldDataSource,
 		jira.NewIssueTypeSchemeDataSource,
+		jira.NewStatusDataSource,
 	}
 }
