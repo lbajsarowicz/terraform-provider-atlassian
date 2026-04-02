@@ -180,7 +180,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	var result jiraProjectAPIResponse
-	apiPath := fmt.Sprintf("/rest/api/3/project/%s", atlassian.QueryEscape(state.Key.ValueString()))
+	apiPath := fmt.Sprintf("/rest/api/3/project/%s", atlassian.PathEscape(state.Key.ValueString()))
 	statusCode, err := r.client.GetWithStatus(ctx, apiPath, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading project", err.Error())
@@ -220,7 +220,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	var result jiraProjectAPIResponse
-	apiPath := fmt.Sprintf("/rest/api/3/project/%s", atlassian.QueryEscape(plan.Key.ValueString()))
+	apiPath := fmt.Sprintf("/rest/api/3/project/%s", atlassian.PathEscape(plan.Key.ValueString()))
 	err := r.client.Put(ctx, apiPath, body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating project", err.Error())
@@ -245,7 +245,7 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	apiPath := fmt.Sprintf("/rest/api/3/project/%s", atlassian.QueryEscape(state.Key.ValueString()))
+	apiPath := fmt.Sprintf("/rest/api/3/project/%s", atlassian.PathEscape(state.Key.ValueString()))
 	statusCode, err := r.client.DeleteWithStatus(ctx, apiPath)
 	if err != nil {
 		resp.Diagnostics.AddError("Error deleting project", err.Error())
@@ -262,7 +262,7 @@ func (r *projectResource) ImportState(ctx context.Context, req resource.ImportSt
 	projectKey := req.ID
 
 	var result jiraProjectAPIResponse
-	apiPath := fmt.Sprintf("/rest/api/3/project/%s", atlassian.QueryEscape(projectKey))
+	apiPath := fmt.Sprintf("/rest/api/3/project/%s", atlassian.PathEscape(projectKey))
 	statusCode, err := r.client.GetWithStatus(ctx, apiPath, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error importing project", err.Error())

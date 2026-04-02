@@ -88,6 +88,12 @@ func QueryEscape(s string) string {
 	return url.QueryEscape(s)
 }
 
+// PathEscape escapes a string for use in URL path segments.
+// Unlike QueryEscape, this encodes spaces as %20 instead of +.
+func PathEscape(s string) string {
+	return url.PathEscape(s)
+}
+
 // newRequest creates a new HTTP request with authentication and standard headers.
 func (c *Client) newRequest(ctx context.Context, method, path string, body *bytes.Reader) (*http.Request, error) {
 	u := c.baseURL + path
