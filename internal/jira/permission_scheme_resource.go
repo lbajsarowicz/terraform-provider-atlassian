@@ -128,7 +128,7 @@ func (r *permissionSchemeResource) Read(ctx context.Context, req resource.ReadRe
 	}
 
 	var result permissionSchemeAPIResponse
-	apiPath := fmt.Sprintf("/rest/api/3/permissionscheme/%s", atlassian.QueryEscape(state.ID.ValueString()))
+	apiPath := fmt.Sprintf("/rest/api/3/permissionscheme/%s", atlassian.PathEscape(state.ID.ValueString()))
 	statusCode, err := r.client.GetWithStatus(ctx, apiPath, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading permission scheme", err.Error())
@@ -160,7 +160,7 @@ func (r *permissionSchemeResource) Update(ctx context.Context, req resource.Upda
 	}
 
 	var result permissionSchemeAPIResponse
-	apiPath := fmt.Sprintf("/rest/api/3/permissionscheme/%s", atlassian.QueryEscape(plan.ID.ValueString()))
+	apiPath := fmt.Sprintf("/rest/api/3/permissionscheme/%s", atlassian.PathEscape(plan.ID.ValueString()))
 	err := r.client.Put(ctx, apiPath, body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating permission scheme", err.Error())
@@ -181,7 +181,7 @@ func (r *permissionSchemeResource) Delete(ctx context.Context, req resource.Dele
 		return
 	}
 
-	apiPath := fmt.Sprintf("/rest/api/3/permissionscheme/%s", atlassian.QueryEscape(state.ID.ValueString()))
+	apiPath := fmt.Sprintf("/rest/api/3/permissionscheme/%s", atlassian.PathEscape(state.ID.ValueString()))
 	statusCode, err := r.client.DeleteWithStatus(ctx, apiPath)
 	if err != nil {
 		resp.Diagnostics.AddError("Error deleting permission scheme", err.Error())
@@ -198,7 +198,7 @@ func (r *permissionSchemeResource) ImportState(ctx context.Context, req resource
 	schemeID := req.ID
 
 	var result permissionSchemeAPIResponse
-	apiPath := fmt.Sprintf("/rest/api/3/permissionscheme/%s", atlassian.QueryEscape(schemeID))
+	apiPath := fmt.Sprintf("/rest/api/3/permissionscheme/%s", atlassian.PathEscape(schemeID))
 	statusCode, err := r.client.GetWithStatus(ctx, apiPath, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error importing permission scheme", err.Error())

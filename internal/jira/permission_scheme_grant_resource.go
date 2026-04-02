@@ -147,7 +147,7 @@ func (r *permissionSchemeGrantResource) Create(ctx context.Context, req resource
 	}
 
 	var result permissionSchemeGrantAPIResponse
-	apiPath := fmt.Sprintf("/rest/api/3/permissionscheme/%s/permission", atlassian.QueryEscape(plan.SchemeID.ValueString()))
+	apiPath := fmt.Sprintf("/rest/api/3/permissionscheme/%s/permission", atlassian.PathEscape(plan.SchemeID.ValueString()))
 	err := r.client.Post(ctx, apiPath, body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating permission scheme grant", err.Error())
@@ -173,8 +173,8 @@ func (r *permissionSchemeGrantResource) Read(ctx context.Context, req resource.R
 
 	var result permissionSchemeGrantAPIResponse
 	apiPath := fmt.Sprintf("/rest/api/3/permissionscheme/%s/permission/%s",
-		atlassian.QueryEscape(state.SchemeID.ValueString()),
-		atlassian.QueryEscape(state.ID.ValueString()),
+		atlassian.PathEscape(state.SchemeID.ValueString()),
+		atlassian.PathEscape(state.ID.ValueString()),
 	)
 	statusCode, err := r.client.GetWithStatus(ctx, apiPath, &result)
 	if err != nil {
@@ -212,8 +212,8 @@ func (r *permissionSchemeGrantResource) Delete(ctx context.Context, req resource
 	}
 
 	apiPath := fmt.Sprintf("/rest/api/3/permissionscheme/%s/permission/%s",
-		atlassian.QueryEscape(state.SchemeID.ValueString()),
-		atlassian.QueryEscape(state.ID.ValueString()),
+		atlassian.PathEscape(state.SchemeID.ValueString()),
+		atlassian.PathEscape(state.ID.ValueString()),
 	)
 	statusCode, err := r.client.DeleteWithStatus(ctx, apiPath)
 	if err != nil {
