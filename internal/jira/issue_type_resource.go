@@ -105,6 +105,9 @@ func (r *issueTypeResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description: "The ID of the avatar for the issue type.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
