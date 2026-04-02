@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -16,7 +18,8 @@ import (
 )
 
 var (
-	_ resource.Resource = &permissionSchemeGrantResource{}
+	_ resource.Resource                = &permissionSchemeGrantResource{}
+	_ resource.ResourceWithImportState = &permissionSchemeGrantResource{}
 )
 
 // NewPermissionSchemeGrantResource returns a new permission scheme grant resource.
@@ -224,5 +227,46 @@ func (r *permissionSchemeGrantResource) Delete(ctx context.Context, req resource
 	// 404 means the grant was already deleted out-of-band; treat as success.
 	if statusCode == http.StatusNotFound {
 		return
+	}
+}
+
+func (r *permissionSchemeGrantResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	parts := strings.SplitN(req.ID, "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			fmt.Sprintf("Expected import ID in the format {scheme_id}/{grant_id}, got %q", req.ID),
+		)
+		return
+	}
+
+	schemeID := parts[0]
+	grantID := parts[1]
+
+	var result permissionSchemeGrantAPIResponse
+	apiPath := fmt.Sprintf("/rest/api/3/permissionscheme/%s/permission/%s",
+		atlassian.PathEscape(schemeID),
+		atlassian.PathEscape(grantID),
+	)
+	statusCode, err := r.client.GetWithStatus(ctx, apiPath, &result)
+	if err != nil {
+		resp.Diagnostics.AddError("Error importing permission scheme grant", err.Error())
+		return
+	}
+
+	if statusCode == http.StatusNotFound {
+		resp.Diagnostics.AddError(
+			"Permission scheme grant not found",
+			fmt.Sprintf("No grant found with scheme ID %q and grant ID %q", schemeID, grantID),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), fmt.Sprintf("%d", result.ID))...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("scheme_id"), schemeID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("permission"), result.Permission)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("holder_type"), result.Holder.Type)...)
+	if result.Holder.Parameter != "" {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("holder_parameter"), result.Holder.Parameter)...)
 	}
 }

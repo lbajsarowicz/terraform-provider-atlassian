@@ -847,6 +847,94 @@ func TestAccProjectPermissionSchemeResource_Read_NotFound(t *testing.T) {
 	})
 }
 
+func TestAccPermissionSchemeGrantResource_Import(t *testing.T) {
+	var grantCreated bool
+	var mu sync.Mutex
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "POST" && r.URL.Path == "/rest/api/3/permissionscheme/10100/permission":
+			var body map[string]interface{}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			mu.Lock()
+			grantCreated = true
+			mu.Unlock()
+			holder := body["holder"].(map[string]interface{})
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"id": 20050,
+				"holder": map[string]interface{}{
+					"type":      holder["type"],
+					"parameter": holder["parameter"],
+				},
+				"permission": body["permission"],
+			})
+
+		case r.Method == "GET" && r.URL.Path == "/rest/api/3/permissionscheme/10100/permission/20050":
+			mu.Lock()
+			c := grantCreated
+			mu.Unlock()
+			if !c {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"id": 20050,
+				"holder": map[string]interface{}{
+					"type":      "group",
+					"parameter": "jira-admins",
+				},
+				"permission": "ADMINISTER_PROJECTS",
+			})
+
+		case r.Method == "DELETE" && r.URL.Path == "/rest/api/3/permissionscheme/10100/permission/20050":
+			mu.Lock()
+			grantCreated = false
+			mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer mockServer.Close()
+
+	t.Setenv("ATLASSIAN_URL", mockServer.URL)
+	t.Setenv("ATLASSIAN_USER", "test@test.com")
+	t.Setenv("ATLASSIAN_TOKEN", "test-token")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
+		CheckDestroy: func(s *terraform.State) error {
+			return nil
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: `resource "atlassian_jira_permission_scheme_grant" "test" {
+  scheme_id        = "10100"
+  permission       = "ADMINISTER_PROJECTS"
+  holder_type      = "group"
+  holder_parameter = "jira-admins"
+}`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("atlassian_jira_permission_scheme_grant.test", "id", "20050"),
+				),
+			},
+			{
+				ResourceName:      "atlassian_jira_permission_scheme_grant.test",
+				ImportState:       true,
+				ImportStateId:     "10100/20050",
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
 func TestAccPermissionSchemeGrantResource_projectRole(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
