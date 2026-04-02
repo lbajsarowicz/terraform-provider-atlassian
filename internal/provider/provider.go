@@ -99,6 +99,7 @@ func (p *AtlassianProvider) Resources(_ context.Context) []func() resource.Resou
 		jira.NewGroupResource,
 		jira.NewProjectResource,
 		jira.NewPermissionSchemeResource,
+		jira.NewPermissionSchemeGrantResource,
 	}
 }
 
