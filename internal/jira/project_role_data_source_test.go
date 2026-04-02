@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/lbajsarowicz/terraform-provider-atlassian/internal/testutil"
 )
 
@@ -37,6 +38,7 @@ func TestAccProjectRoleDataSource_basic(t *testing.T) {
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
+		CheckDestroy: func(s *terraform.State) error { return nil },
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(`data "atlassian_jira_project_role" "test" { name = %q }`, roleName),
@@ -70,6 +72,7 @@ func TestAccProjectRoleDataSource_NotFound(t *testing.T) {
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
+		CheckDestroy: func(s *terraform.State) error { return nil },
 		Steps: []resource.TestStep{
 			{
 				Config:      `data "atlassian_jira_project_role" "test" { name = "NonExistentRole" }`,

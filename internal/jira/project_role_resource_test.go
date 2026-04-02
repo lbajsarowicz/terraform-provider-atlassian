@@ -328,3 +328,60 @@ func TestAccProjectRoleResource_Import(t *testing.T) {
 		},
 	})
 }
+
+func TestAccProjectRoleResource_Delete_NotFound(t *testing.T) {
+	roleName := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
+
+	var deleteReturns404 atomic.Bool
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "POST" && r.URL.Path == "/rest/api/3/role":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":          10104,
+				"name":        roleName,
+				"description": "",
+			})
+		case r.Method == "GET" && r.URL.Path == "/rest/api/3/role/10104":
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":          10104,
+				"name":        roleName,
+				"description": "",
+			})
+		case r.Method == "DELETE" && r.URL.Path == "/rest/api/3/role/10104":
+			if deleteReturns404.Load() {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer mockServer.Close()
+
+	t.Setenv("ATLASSIAN_URL", mockServer.URL)
+	t.Setenv("ATLASSIAN_USER", "test@test.com")
+	t.Setenv("ATLASSIAN_TOKEN", "test-token")
+
+	// Make DELETE return 404 to simulate already-deleted resource
+	deleteReturns404.Store(true)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
+		CheckDestroy: func(s *terraform.State) error {
+			return nil
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`resource "atlassian_jira_project_role" "test" { name = %q }`, roleName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("atlassian_jira_project_role.test", "id", "10104"),
+				),
+			},
+		},
+	})
+}
