@@ -104,6 +104,7 @@ func (p *AtlassianProvider) Resources(_ context.Context) []func() resource.Resou
 		jira.NewIssueTypeResource,
 		jira.NewProjectRoleResource,
 		jira.NewProjectRoleActorResource,
+		jira.NewCustomFieldResource,
 	}
 }
 
