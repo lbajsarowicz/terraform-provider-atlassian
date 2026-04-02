@@ -582,7 +582,7 @@ func TestAccProjectPermissionSchemeResource_basic(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == "PUT" && r.URL.Path == "/rest/api/3/project/PROJ/permissionscheme":
-			var body map[string]string
+			var body map[string]interface{}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				return
@@ -646,16 +646,12 @@ func TestAccProjectPermissionSchemeResource_update(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == "PUT" && r.URL.Path == "/rest/api/3/project/PROJ/permissionscheme":
-			var body map[string]string
+			var body map[string]interface{}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			var id int
-			if _, err := fmt.Sscanf(body["id"], "%d", &id); err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
+			id := int(body["id"].(float64))
 			mu.Lock()
 			currentSchemeID = id
 			mu.Unlock()
