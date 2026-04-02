@@ -162,6 +162,8 @@ func (r *permissionSchemeGrantResource) Create(ctx context.Context, req resource
 	plan.HolderType = types.StringValue(result.Holder.Type)
 	if result.Holder.Parameter != "" {
 		plan.HolderParameter = types.StringValue(result.Holder.Parameter)
+	} else {
+		plan.HolderParameter = types.StringNull()
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -195,6 +197,8 @@ func (r *permissionSchemeGrantResource) Read(ctx context.Context, req resource.R
 	state.HolderType = types.StringValue(result.Holder.Type)
 	if result.Holder.Parameter != "" {
 		state.HolderParameter = types.StringValue(result.Holder.Parameter)
+	} else {
+		state.HolderParameter = types.StringNull()
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
