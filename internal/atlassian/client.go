@@ -88,6 +88,12 @@ func QueryEscape(s string) string {
 	return url.QueryEscape(s)
 }
 
+// PathEscape escapes a string for use in URL path segments.
+// Unlike QueryEscape, this encodes spaces as %20 instead of +.
+func PathEscape(s string) string {
+	return url.PathEscape(s)
+}
+
 // newRequest creates a new HTTP request with authentication and standard headers.
 func (c *Client) newRequest(ctx context.Context, method, path string, body *bytes.Reader) (*http.Request, error) {
 	u := c.baseURL + path
@@ -125,7 +131,7 @@ func (c *Client) Do(ctx context.Context, method, path string, body []byte) (*htt
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		// Reset body reader position for retries
 		if bodyReader != nil {
-			bodyReader.Seek(0, io.SeekStart)
+			_, _ = bodyReader.Seek(0, io.SeekStart)
 		}
 
 		req, err := c.newRequest(ctx, method, path, bodyReader)
@@ -140,7 +146,7 @@ func (c *Client) Do(ctx context.Context, method, path string, body []byte) (*htt
 
 		// Rate limited
 		if resp.StatusCode == http.StatusTooManyRequests {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if attempt == maxRetries {
 				return nil, fmt.Errorf("rate limited after %d retries", maxRetries)
 			}
@@ -151,7 +157,7 @@ func (c *Client) Do(ctx context.Context, method, path string, body []byte) (*htt
 
 		// Server error — retry with exponential backoff
 		if resp.StatusCode >= 500 {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if attempt == maxRetries {
 				return nil, fmt.Errorf("server error (HTTP %d) after %d retries", resp.StatusCode, maxRetries)
 			}
@@ -296,6 +302,27 @@ func (c *Client) Delete(ctx context.Context, path string) error {
 	}
 
 	return nil
+}
+
+// DeleteWithStatus performs a DELETE request and returns the HTTP status code.
+// On 404, returns (404, nil) — the caller decides how to handle it.
+func (c *Client) DeleteWithStatus(ctx context.Context, path string) (int, error) {
+	resp, err := c.Do(ctx, "DELETE", path, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return http.StatusNotFound, nil
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, fmt.Errorf("DELETE %s: unexpected status %d: %s", path, resp.StatusCode, string(bodyBytes))
+	}
+
+	return resp.StatusCode, nil
 }
 
 // parseRetryAfter parses the Retry-After header value as seconds.
