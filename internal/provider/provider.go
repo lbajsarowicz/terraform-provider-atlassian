@@ -110,5 +110,6 @@ func (p *AtlassianProvider) DataSources(_ context.Context) []func() datasource.D
 		jira.NewGroupDataSource,
 		jira.NewProjectDataSource,
 		jira.NewPermissionSchemeDataSource,
+		jira.NewIssueTypeDataSource,
 	}
 }
