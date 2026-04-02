@@ -3,8 +3,10 @@ package jira
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -152,12 +154,46 @@ func (r *projectPermissionSchemeResource) Delete(ctx context.Context, req resour
 		return
 	}
 
-	defaultSchemeID := "0"
+	var defaultSchemeID string
+
+	// Primary: exact match on "Default Permission Scheme".
 	for _, scheme := range listResult.PermissionSchemes {
 		if scheme.Name == "Default Permission Scheme" {
 			defaultSchemeID = fmt.Sprintf("%d", scheme.ID)
 			break
 		}
+	}
+
+	// Secondary heuristic: look for any scheme with "Default" in the name.
+	if defaultSchemeID == "" {
+		for _, scheme := range listResult.PermissionSchemes {
+			if strings.Contains(strings.ToLower(scheme.Name), "default") {
+				defaultSchemeID = fmt.Sprintf("%d", scheme.ID)
+				break
+			}
+		}
+	}
+
+	// Tertiary heuristic: use the scheme with the lowest ID.
+	if defaultSchemeID == "" {
+		lowestID := math.MaxInt64
+		for _, scheme := range listResult.PermissionSchemes {
+			if scheme.ID < lowestID {
+				lowestID = scheme.ID
+				defaultSchemeID = fmt.Sprintf("%d", scheme.ID)
+			}
+		}
+	}
+
+	if defaultSchemeID == "" {
+		resp.Diagnostics.AddWarning(
+			"Default permission scheme not found",
+			"Could not find a permission scheme named 'Default Permission Scheme'. "+
+				"The project's permission scheme association has been removed from state but the "+
+				"project may still have its current scheme assigned. Manually verify the project's "+
+				"permission scheme in Jira.",
+		)
+		return
 	}
 
 	resp.Diagnostics.Append(r.assignScheme(ctx, state.ProjectKey.ValueString(), defaultSchemeID)...)
