@@ -362,26 +362,6 @@ func (r *issueTypeSchemeResource) findSchemeByID(ctx context.Context, schemeID s
 	return nil, false, nil
 }
 
-// findSchemeByName fetches all issue type schemes and returns the one with the given name.
-func (r *issueTypeSchemeResource) findSchemeByName(ctx context.Context, name string) (*issueTypeSchemeAPIResponse, bool, error) {
-	allValues, err := r.client.GetAllPages(ctx, "/rest/api/3/issuetypescheme")
-	if err != nil {
-		return nil, false, err
-	}
-
-	for _, raw := range allValues {
-		var scheme issueTypeSchemeAPIResponse
-		if err := json.Unmarshal(raw, &scheme); err != nil {
-			return nil, false, fmt.Errorf("unmarshaling issue type scheme: %w", err)
-		}
-		if scheme.Name == name {
-			return &scheme, true, nil
-		}
-	}
-
-	return nil, false, nil
-}
-
 // getSchemeIssueTypeIDs fetches the ordered list of issue type IDs for a scheme.
 func (r *issueTypeSchemeResource) getSchemeIssueTypeIDs(ctx context.Context, schemeID string) ([]string, error) {
 	itemsPath := fmt.Sprintf("/rest/api/3/issuetypescheme/mapping?issueTypeSchemeId=%s", atlassian.QueryEscape(schemeID))
