@@ -188,7 +188,14 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	apiPath := fmt.Sprintf("/rest/api/3/workflow/search?workflowName=%s", atlassian.QueryEscape(state.Name.ValueString()))
+	// When importing by ID, state.Name may be empty. In that case search without
+	// a name filter so we can locate the workflow by entity ID across the results.
+	var apiPath string
+	if state.Name.ValueString() != "" {
+		apiPath = fmt.Sprintf("/rest/api/3/workflow/search?workflowName=%s", atlassian.QueryEscape(state.Name.ValueString()))
+	} else {
+		apiPath = "/rest/api/3/workflow/search"
+	}
 
 	var searchResp workflowSearchResponse
 	statusCode, err := r.client.GetWithStatus(ctx, apiPath, &searchResp)
@@ -220,13 +227,14 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 	state.Name = types.StringValue(found.Name)
 	state.Description = types.StringValue(found.Description)
 
-	// Extract status IDs from the API response
-	statusIDs := make([]string, len(found.Statuses))
+	// Extract status references from the API response. Use StatusReference (the
+	// value that was sent on create) to keep state consistent with configuration.
+	statusRefs := make([]string, len(found.Statuses))
 	for i, s := range found.Statuses {
-		statusIDs[i] = s.ID
+		statusRefs[i] = s.StatusReference
 	}
 
-	statusList, diags := types.ListValueFrom(ctx, types.StringType, statusIDs)
+	statusList, diags := types.ListValueFrom(ctx, types.StringType, statusRefs)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

@@ -106,12 +106,13 @@ func (d *workflowDataSource) Read(ctx context.Context, req datasource.ReadReques
 			config.ID = types.StringValue(wf.ID.EntityID)
 			config.Description = types.StringValue(wf.Description)
 
-			statusIDs := make([]string, len(wf.Statuses))
+			// Use StatusReference to be consistent with the resource's create path.
+			statusRefs := make([]string, len(wf.Statuses))
 			for i, s := range wf.Statuses {
-				statusIDs[i] = s.ID
+				statusRefs[i] = s.StatusReference
 			}
 
-			statusList, diags := types.ListValueFrom(ctx, types.StringType, statusIDs)
+			statusList, diags := types.ListValueFrom(ctx, types.StringType, statusRefs)
 			resp.Diagnostics.Append(diags...)
 			if resp.Diagnostics.HasError() {
 				return
