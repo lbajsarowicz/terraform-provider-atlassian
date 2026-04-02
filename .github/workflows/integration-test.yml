@@ -1,0 +1,45 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-tests
+  cancel-in-progress: false
+
+jobs:
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: integration
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          ATLASSIAN_URL: op://terraform-provider-atlassian/atlassian-api-token/url
+          ATLASSIAN_USER: op://terraform-provider-atlassian/atlassian-api-token/email
+          ATLASSIAN_TOKEN: op://terraform-provider-atlassian/atlassian-api-token/api-token
+
+      - name: Run integration tests
+        env:
+          TF_ACC: "1"
+        run: go test ./internal/jira/... -v -count=1 -timeout 30m -run '^TestIntegration'
+
+      - name: Sweep stale resources
+        if: always()
+        run: go test ./internal/jira/... -v -sweep=all -timeout 10m
