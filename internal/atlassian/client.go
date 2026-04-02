@@ -125,7 +125,7 @@ func (c *Client) Do(ctx context.Context, method, path string, body []byte) (*htt
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		// Reset body reader position for retries
 		if bodyReader != nil {
-			bodyReader.Seek(0, io.SeekStart)
+			_, _ = bodyReader.Seek(0, io.SeekStart)
 		}
 
 		req, err := c.newRequest(ctx, method, path, bodyReader)
@@ -140,7 +140,7 @@ func (c *Client) Do(ctx context.Context, method, path string, body []byte) (*htt
 
 		// Rate limited
 		if resp.StatusCode == http.StatusTooManyRequests {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if attempt == maxRetries {
 				return nil, fmt.Errorf("rate limited after %d retries", maxRetries)
 			}
@@ -151,7 +151,7 @@ func (c *Client) Do(ctx context.Context, method, path string, body []byte) (*htt
 
 		// Server error — retry with exponential backoff
 		if resp.StatusCode >= 500 {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if attempt == maxRetries {
 				return nil, fmt.Errorf("server error (HTTP %d) after %d retries", resp.StatusCode, maxRetries)
 			}
