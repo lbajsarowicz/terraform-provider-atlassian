@@ -54,8 +54,8 @@ type jiraProjectAPIResponse struct {
 	AssigneeType string `json:"assigneeType"`
 }
 
-// jiraProjectCreateRequest represents the POST/PUT request body for creating/updating a project.
-type jiraProjectCreateRequest struct {
+// jiraProjectWriteRequest represents the POST/PUT request body for creating or updating a project.
+type jiraProjectWriteRequest struct {
 	Key            string `json:"key"`
 	Name           string `json:"name"`
 	Description    string `json:"description,omitempty"`
@@ -147,7 +147,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	body := jiraProjectCreateRequest{
+	body := jiraProjectWriteRequest{
 		Key:            plan.Key.ValueString(),
 		Name:           plan.Name.ValueString(),
 		Description:    plan.Description.ValueString(),
@@ -210,7 +210,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	body := jiraProjectCreateRequest{
+	body := jiraProjectWriteRequest{
 		Key:            plan.Key.ValueString(),
 		Name:           plan.Name.ValueString(),
 		Description:    plan.Description.ValueString(),
