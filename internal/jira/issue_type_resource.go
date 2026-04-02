@@ -150,13 +150,16 @@ func (r *issueTypeResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	// Server-generated: ID and HierarchyLevel always come from response.
 	plan.ID = types.StringValue(result.ID)
-	plan.Name = types.StringValue(result.Name)
-	plan.Description = types.StringValue(result.Description)
 	plan.HierarchyLevel = types.Int64Value(result.HierarchyLevel)
-	plan.AvatarID = types.Int64Value(result.AvatarID)
-	// Preserve the plan type value — API response uses subtask bool, not type string
-	// plan.Type is already set from plan
+
+	// AvatarID: use plan value when explicitly set, otherwise take server default.
+	if plan.AvatarID.IsNull() || plan.AvatarID.IsUnknown() {
+		plan.AvatarID = types.Int64Value(result.AvatarID)
+	}
+
+	// Name, Description, Type are preserved from the plan (user intent).
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -227,12 +230,16 @@ func (r *issueTypeResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	plan.ID = types.StringValue(result.ID)
-	plan.Name = types.StringValue(result.Name)
-	plan.Description = types.StringValue(result.Description)
+	// Server-generated: HierarchyLevel comes from response.
 	plan.HierarchyLevel = types.Int64Value(result.HierarchyLevel)
-	plan.AvatarID = types.Int64Value(result.AvatarID)
-	// Preserve the plan type value
+
+	// AvatarID: use plan value when explicitly set, otherwise take server value.
+	if plan.AvatarID.IsNull() || plan.AvatarID.IsUnknown() {
+		plan.AvatarID = types.Int64Value(result.AvatarID)
+	}
+
+	// ID is carried forward from state (unchanged on update).
+	// Name, Description, Type are preserved from the plan (user intent).
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
