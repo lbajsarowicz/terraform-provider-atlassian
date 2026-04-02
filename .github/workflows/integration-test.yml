@@ -25,18 +25,21 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          ATLASSIAN_URL: op://terraform-provider-atlassian/atlassian-api-token/url
+          ATLASSIAN_USER: op://terraform-provider-atlassian/atlassian-api-token/email
+          ATLASSIAN_TOKEN: op://terraform-provider-atlassian/atlassian-api-token/api-token
+
       - name: Run integration tests
         env:
           TF_ACC: "1"
-          ATLASSIAN_URL: ${{ secrets.ATLASSIAN_URL }}
-          ATLASSIAN_USER: ${{ secrets.ATLASSIAN_USER }}
-          ATLASSIAN_TOKEN: ${{ secrets.ATLASSIAN_TOKEN }}
         run: go test ./internal/jira/... -v -count=1 -timeout 30m -run '^TestIntegration'
 
       - name: Sweep stale resources
         if: always()
-        env:
-          ATLASSIAN_URL: ${{ secrets.ATLASSIAN_URL }}
-          ATLASSIAN_USER: ${{ secrets.ATLASSIAN_USER }}
-          ATLASSIAN_TOKEN: ${{ secrets.ATLASSIAN_TOKEN }}
         run: go test ./internal/jira/... -v -sweep=all -timeout 10m
