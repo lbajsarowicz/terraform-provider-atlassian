@@ -112,7 +112,7 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	config.ID = types.StringValue(result.ID)
+	config.ID = types.StringValue(result.ID.String())
 	config.Key = types.StringValue(result.Key)
 	config.Name = types.StringValue(result.Name)
 	config.Description = types.StringValue(result.Description)

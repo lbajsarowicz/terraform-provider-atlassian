@@ -2,6 +2,7 @@ package jira
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -41,9 +42,10 @@ type projectResourceModel struct {
 	AssigneeType   types.String `tfsdk:"assignee_type"`
 }
 
-// jiraProjectAPIResponse represents the Jira project API GET response shape.
+// jiraProjectAPIResponse represents the Jira project API response shape.
+// ID uses json.Number because POST returns a number while GET returns a string.
 type jiraProjectAPIResponse struct {
-	ID             string `json:"id"`
+	ID             json.Number `json:"id"`
 	Key            string `json:"key"`
 	Name           string `json:"name"`
 	Description    string `json:"description,omitempty"`
@@ -166,7 +168,7 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	// Jira POST /rest/api/3/project returns only {self, id, key} — not the full
 	// project object. Use the response for id and key; keep plan values for
 	// name, description, project_type_key, lead_account_id, and assignee_type.
-	plan.ID = types.StringValue(result.ID)
+	plan.ID = types.StringValue(result.ID.String())
 	plan.Key = types.StringValue(result.Key)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -192,7 +194,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	state.ID = types.StringValue(result.ID)
+	state.ID = types.StringValue(result.ID.String())
 	state.Key = types.StringValue(result.Key)
 	state.Name = types.StringValue(result.Name)
 	state.Description = types.StringValue(result.Description)
@@ -227,7 +229,7 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	plan.ID = types.StringValue(result.ID)
+	plan.ID = types.StringValue(result.ID.String())
 	plan.Key = types.StringValue(result.Key)
 	plan.Name = types.StringValue(result.Name)
 	plan.Description = types.StringValue(result.Description)
@@ -277,7 +279,7 @@ func (r *projectResource) ImportState(ctx context.Context, req resource.ImportSt
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), result.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), result.ID.String())...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("key"), result.Key)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), result.Name)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("description"), result.Description)...)
