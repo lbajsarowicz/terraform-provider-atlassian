@@ -355,3 +355,78 @@ func TestAccProjectRoleActorResource_Import(t *testing.T) {
 		},
 	})
 }
+
+func TestAccProjectRoleActorResource_Import_Group(t *testing.T) {
+	var mu sync.Mutex
+	actors := []map[string]interface{}{}
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "POST" && strings.HasPrefix(r.URL.Path, "/rest/api/3/project/PROJ/role/10200"):
+			mu.Lock()
+			actors = append(actors, map[string]interface{}{
+				"id":          2001,
+				"displayName": "jira-developers",
+				"type":        "atlassian-group-role-actor",
+				"actorGroup": map[string]string{
+					"displayName": "jira-developers",
+					"name":        "jira-developers",
+					"groupId":     "group-id-456",
+				},
+			})
+			mu.Unlock()
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			mu.Lock()
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":     10200,
+				"name":   "Administrators",
+				"actors": actors,
+			})
+			mu.Unlock()
+		case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/rest/api/3/project/PROJ/role/10200"):
+			mu.Lock()
+			a := make([]map[string]interface{}, len(actors))
+			copy(a, actors)
+			mu.Unlock()
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":     10200,
+				"name":   "Administrators",
+				"actors": a,
+			})
+		case r.Method == "DELETE" && strings.HasPrefix(r.URL.Path, "/rest/api/3/project/PROJ/role/10200"):
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer mockServer.Close()
+
+	t.Setenv("ATLASSIAN_URL", mockServer.URL)
+	t.Setenv("ATLASSIAN_USER", "test@test.com")
+	t.Setenv("ATLASSIAN_TOKEN", "test-token")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
+		CheckDestroy: func(s *terraform.State) error {
+			return nil
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: `resource "atlassian_jira_project_role_actor" "test" {
+					project_key = "PROJ"
+					role_id     = "10200"
+					actor_type  = "atlassianGroup"
+					actor_value = "jira-developers"
+				}`,
+			},
+			{
+				ResourceName:      "atlassian_jira_project_role_actor.test",
+				ImportState:       true,
+				ImportStateId:     "PROJ/10200/atlassianGroup/jira-developers",
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
