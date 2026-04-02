@@ -104,7 +104,7 @@ func (r *projectPermissionSchemeResource) Read(ctx context.Context, req resource
 	}
 
 	var result projectPermissionSchemeAPIResponse
-	apiPath := fmt.Sprintf("/rest/api/3/project/%s/permissionscheme", atlassian.QueryEscape(state.ProjectKey.ValueString()))
+	apiPath := fmt.Sprintf("/rest/api/3/project/%s/permissionscheme", atlassian.PathEscape(state.ProjectKey.ValueString()))
 	statusCode, err := r.client.GetWithStatus(ctx, apiPath, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading project permission scheme", err.Error())
@@ -166,7 +166,7 @@ func (r *projectPermissionSchemeResource) ImportState(ctx context.Context, req r
 	projectKey := req.ID
 
 	var result projectPermissionSchemeAPIResponse
-	apiPath := fmt.Sprintf("/rest/api/3/project/%s/permissionscheme", atlassian.QueryEscape(projectKey))
+	apiPath := fmt.Sprintf("/rest/api/3/project/%s/permissionscheme", atlassian.PathEscape(projectKey))
 	statusCode, err := r.client.GetWithStatus(ctx, apiPath, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error importing project permission scheme", err.Error())
@@ -194,7 +194,7 @@ func (r *projectPermissionSchemeResource) assignScheme(ctx context.Context, proj
 	}
 
 	var result projectPermissionSchemeAPIResponse
-	apiPath := fmt.Sprintf("/rest/api/3/project/%s/permissionscheme", atlassian.QueryEscape(projectKey))
+	apiPath := fmt.Sprintf("/rest/api/3/project/%s/permissionscheme", atlassian.PathEscape(projectKey))
 	err := r.client.Put(ctx, apiPath, body, &result)
 	if err != nil {
 		diags.AddError("Error assigning permission scheme to project", err.Error())
