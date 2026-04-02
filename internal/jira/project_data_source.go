@@ -26,8 +26,10 @@ type projectDataSourceModel struct {
 	Key            types.String `tfsdk:"key"`
 	ID             types.String `tfsdk:"id"`
 	Name           types.String `tfsdk:"name"`
+	Description    types.String `tfsdk:"description"`
 	ProjectTypeKey types.String `tfsdk:"project_type_key"`
 	LeadAccountID  types.String `tfsdk:"lead_account_id"`
+	AssigneeType   types.String `tfsdk:"assignee_type"`
 }
 
 func (d *projectDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -50,12 +52,20 @@ func (d *projectDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 				Description: "The name of the project.",
 				Computed:    true,
 			},
+			"description": schema.StringAttribute{
+				Description: "The description of the project.",
+				Computed:    true,
+			},
 			"project_type_key": schema.StringAttribute{
 				Description: "The project type key (e.g. software, service_desk, business).",
 				Computed:    true,
 			},
 			"lead_account_id": schema.StringAttribute{
 				Description: "The account ID of the project lead.",
+				Computed:    true,
+			},
+			"assignee_type": schema.StringAttribute{
+				Description: "The default assignee type (e.g. PROJECT_LEAD, UNASSIGNED).",
 				Computed:    true,
 			},
 		},
@@ -105,8 +115,10 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	config.ID = types.StringValue(result.ID)
 	config.Key = types.StringValue(result.Key)
 	config.Name = types.StringValue(result.Name)
+	config.Description = types.StringValue(result.Description)
 	config.ProjectTypeKey = types.StringValue(result.ProjectTypeKey)
 	config.LeadAccountID = types.StringValue(result.Lead.AccountID)
+	config.AssigneeType = types.StringValue(result.AssigneeType)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
 }
