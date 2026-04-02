@@ -98,6 +98,7 @@ func (p *AtlassianProvider) Resources(_ context.Context) []func() resource.Resou
 	return []func() resource.Resource{
 		jira.NewGroupResource,
 		jira.NewProjectResource,
+		jira.NewPermissionSchemeResource,
 	}
 }
 
