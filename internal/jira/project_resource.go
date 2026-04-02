@@ -163,13 +163,11 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	// Jira POST /rest/api/3/project returns only {self, id, key} — not the full
+	// project object. Use the response for id and key; keep plan values for
+	// name, description, project_type_key, lead_account_id, and assignee_type.
 	plan.ID = types.StringValue(result.ID)
 	plan.Key = types.StringValue(result.Key)
-	plan.Name = types.StringValue(result.Name)
-	plan.Description = types.StringValue(result.Description)
-	plan.ProjectTypeKey = types.StringValue(result.ProjectTypeKey)
-	plan.LeadAccountID = types.StringValue(result.Lead.AccountID)
-	plan.AssigneeType = types.StringValue(result.AssigneeType)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
