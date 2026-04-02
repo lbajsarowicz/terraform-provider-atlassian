@@ -21,3 +21,9 @@ lint:
 
 clean:
 	rm -f $(BINARY_NAME)
+
+testintegration:
+	TF_ACC=1 go test ./internal/jira/... -v -count=1 -timeout 30m -run '^TestIntegration'
+
+sweep:
+	go test ./internal/jira/... -v -sweep=all -timeout 10m
