@@ -54,9 +54,9 @@ type issueTypeAPIResponse struct {
 // issueTypeWriteRequest represents the Jira issue type create/update request body.
 type issueTypeWriteRequest struct {
 	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
+	Description string `json:"description"`
 	Type        string `json:"type"`
-	AvatarID    int64  `json:"avatarId,omitempty"`
+	AvatarID    *int64 `json:"avatarId,omitempty"`
 }
 
 func (r *issueTypeResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -140,7 +140,8 @@ func (r *issueTypeResource) Create(ctx context.Context, req resource.CreateReque
 		Type:        plan.Type.ValueString(),
 	}
 	if !plan.AvatarID.IsNull() && !plan.AvatarID.IsUnknown() {
-		body.AvatarID = plan.AvatarID.ValueInt64()
+		v := plan.AvatarID.ValueInt64()
+		body.AvatarID = &v
 	}
 
 	var result issueTypeAPIResponse
@@ -219,7 +220,8 @@ func (r *issueTypeResource) Update(ctx context.Context, req resource.UpdateReque
 		Type:        plan.Type.ValueString(),
 	}
 	if !plan.AvatarID.IsNull() && !plan.AvatarID.IsUnknown() {
-		body.AvatarID = plan.AvatarID.ValueInt64()
+		v := plan.AvatarID.ValueInt64()
+		body.AvatarID = &v
 	}
 
 	var result issueTypeAPIResponse
