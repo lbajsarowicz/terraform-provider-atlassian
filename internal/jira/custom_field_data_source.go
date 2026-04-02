@@ -94,20 +94,31 @@ func (d *customFieldDataSource) Read(ctx context.Context, req datasource.ReadReq
 	}
 
 	name := config.Name.ValueString()
+	var matched []customFieldAPIResponse
 	for _, f := range fields {
 		if f.Custom && f.Name == name {
-			config.ID = types.StringValue(f.ID)
-			config.Description = types.StringValue(f.Description)
-			config.Type = types.StringValue(f.Schema.Custom)
-			config.SearcherKey = types.StringValue(f.SearcherKey)
-
-			resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
-			return
+			matched = append(matched, f)
 		}
 	}
 
-	resp.Diagnostics.AddError(
-		"Custom field not found",
-		fmt.Sprintf("No custom field found with name %q", name),
-	)
+	switch len(matched) {
+	case 0:
+		resp.Diagnostics.AddError(
+			"Custom field not found",
+			fmt.Sprintf("No custom field found with name %q", name),
+		)
+	case 1:
+		f := matched[0]
+		config.ID = types.StringValue(f.ID)
+		config.Description = types.StringValue(f.Description)
+		config.Type = types.StringValue(f.Schema.Custom)
+		config.SearcherKey = types.StringValue(f.SearcherKey)
+
+		resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
+	default:
+		resp.Diagnostics.AddError(
+			"Ambiguous custom field name",
+			fmt.Sprintf("Found %d custom fields with name %q; use the ID to import the correct one", len(matched), name),
+		)
+	}
 }

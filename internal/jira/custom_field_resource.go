@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/lbajsarowicz/terraform-provider-atlassian/internal/atlassian"
@@ -88,7 +87,9 @@ func (r *customFieldResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Description: "The description of the custom field.",
 				Optional:    true,
 				Computed:    true,
-				Default:     stringdefault.StaticString(""),
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"type": schema.StringAttribute{
 				Description: "The type of the custom field (e.g. com.atlassian.jira.plugin.system.customfieldtypes:textfield). Changing this forces recreation.",
@@ -158,7 +159,12 @@ func (r *customFieldResource) Create(ctx context.Context, req resource.CreateReq
 		plan.SearcherKey = types.StringValue(result.SearcherKey)
 	}
 
-	// Name, Description, Type are preserved from the plan (user intent).
+	// Description: use response value if plan was unknown/null (not explicitly set in config).
+	if plan.Description.IsNull() || plan.Description.IsUnknown() {
+		plan.Description = types.StringValue(result.Description)
+	}
+
+	// Name, Type are preserved from the plan (user intent).
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }

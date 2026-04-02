@@ -445,3 +445,45 @@ func TestAccCustomFieldDataSource_NotFound(t *testing.T) {
 		},
 	})
 }
+
+// TestAccCustomFieldDataSource_AmbiguousName verifies an error is returned when multiple fields share the same name.
+func TestAccCustomFieldDataSource_AmbiguousName(t *testing.T) {
+	name := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" && r.URL.Path == "/rest/api/3/field" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]map[string]interface{}{ //nolint:errcheck
+				{
+					"id":     "customfield_10100",
+					"name":   name,
+					"custom": true,
+					"schema": map[string]interface{}{"type": "string", "custom": testFieldType, "customId": testFieldCustomID},
+				},
+				{
+					"id":     "customfield_10101",
+					"name":   name,
+					"custom": true,
+					"schema": map[string]interface{}{"type": "string", "custom": testFieldType, "customId": int64(10101)},
+				},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockServer.Close()
+
+	t.Setenv("ATLASSIAN_URL", mockServer.URL)
+	t.Setenv("ATLASSIAN_USER", "test@test.com")
+	t.Setenv("ATLASSIAN_TOKEN", "test-token")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      fmt.Sprintf(`data "atlassian_jira_custom_field" "test" { name = %q }`, name),
+				ExpectError: regexp.MustCompile("Ambiguous custom field name"),
+			},
+		},
+	})
+}
