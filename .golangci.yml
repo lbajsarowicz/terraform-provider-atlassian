@@ -7,3 +7,18 @@ linters:
     - errcheck
     - staticcheck
     - ineffassign
+
+linters-settings:
+  errcheck:
+    exclude-functions:
+      - (net/http.ResponseWriter).Write
+      - (*encoding/json.Encoder).Encode
+      - fmt.Fprintf
+      - fmt.Fprintln
+      - (io.Closer).Close
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
