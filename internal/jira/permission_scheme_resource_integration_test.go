@@ -145,8 +145,29 @@ func TestIntegrationPermissionSchemeGrantResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("atlassian_jira_permission_scheme_grant.test", "permission", "BROWSE_PROJECTS"),
 				),
 			},
+			{
+				ResourceName:            "atlassian_jira_permission_scheme_grant.test",
+				ImportState:             true,
+				ImportStateIdFunc:       testImportPermissionSchemeGrantID("atlassian_jira_permission_scheme_grant.test"),
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"scheme_id"},
+			},
 		},
 	})
+}
+
+// testImportPermissionSchemeGrantID returns a function that builds the composite
+// import ID "{scheme_id}/{grant_id}" from the Terraform state.
+func testImportPermissionSchemeGrantID(resourceAddr string) resource.ImportStateIdFunc {
+	return func(s *terraform.State) (string, error) {
+		rs, ok := s.RootModule().Resources[resourceAddr]
+		if !ok {
+			return "", fmt.Errorf("resource %s not found in state", resourceAddr)
+		}
+		schemeID := rs.Primary.Attributes["scheme_id"]
+		grantID := rs.Primary.ID
+		return fmt.Sprintf("%s/%s", schemeID, grantID), nil
+	}
 }
 
 func testCheckPermissionSchemeDestroyed(s *terraform.State) error {
