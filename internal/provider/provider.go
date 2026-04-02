@@ -101,6 +101,7 @@ func (p *AtlassianProvider) Resources(_ context.Context) []func() resource.Resou
 		jira.NewPermissionSchemeResource,
 		jira.NewPermissionSchemeGrantResource,
 		jira.NewProjectPermissionSchemeResource,
+		jira.NewIssueTypeResource,
 	}
 }
 
@@ -109,5 +110,6 @@ func (p *AtlassianProvider) DataSources(_ context.Context) []func() datasource.D
 		jira.NewGroupDataSource,
 		jira.NewProjectDataSource,
 		jira.NewPermissionSchemeDataSource,
+		jira.NewIssueTypeDataSource,
 	}
 }
