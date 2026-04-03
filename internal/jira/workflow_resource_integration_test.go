@@ -49,7 +49,7 @@ func sweepWorkflows(_ string) error {
 			continue
 		}
 
-		delPath := fmt.Sprintf("/rest/api/3/workflow?workflowId=%s", atlassian.QueryEscape(wf.ID.EntityID))
+		delPath := fmt.Sprintf("/rest/api/3/workflow/%s", atlassian.PathEscape(wf.ID.EntityID))
 		_, delErr := client.DeleteWithStatus(ctx, delPath)
 		if delErr != nil {
 			fmt.Printf("[WARN] Failed to delete workflow %q (%s): %s\n", wf.Name, wf.ID.EntityID, delErr)

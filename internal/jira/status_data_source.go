@@ -91,7 +91,7 @@ func (d *statusDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		if s.Name == name {
 			config.ID = types.StringValue(s.ID)
 			config.Description = types.StringValue(s.Description)
-			config.StatusCategory = types.StringValue(s.StatusCategory.Key)
+			config.StatusCategory = types.StringValue(s.statusCategoryKey())
 
 			resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
 			return

@@ -40,13 +40,34 @@ type statusResourceModel struct {
 }
 
 // statusAPIItem represents a single Jira status in API responses.
+// statusCategory varies by endpoint: the search endpoint returns a string
+// (e.g., "TODO") while some responses return a nested object ({"key": "TODO"}).
 type statusAPIItem struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	StatusCategory struct {
+	ID                string          `json:"id"`
+	Name              string          `json:"name"`
+	Description       string          `json:"description"`
+	RawStatusCategory json.RawMessage `json:"statusCategory"`
+}
+
+// statusCategoryKey extracts the status category key from the raw JSON.
+// Handles both string ("TODO") and nested object ({"key": "TODO"}) shapes.
+func (s statusAPIItem) statusCategoryKey() string {
+	if len(s.RawStatusCategory) == 0 {
+		return ""
+	}
+	// Try string first (e.g., "TODO").
+	var str string
+	if json.Unmarshal(s.RawStatusCategory, &str) == nil {
+		return str
+	}
+	// Fall back to nested object (e.g., {"key": "TODO"}).
+	var obj struct {
 		Key string `json:"key"`
-	} `json:"statusCategory"`
+	}
+	if json.Unmarshal(s.RawStatusCategory, &obj) == nil {
+		return obj.Key
+	}
+	return ""
 }
 
 type statusCreateRequest struct {
@@ -202,7 +223,7 @@ func (r *statusResource) Read(ctx context.Context, req resource.ReadRequest, res
 	state.ID = types.StringValue(item.ID)
 	state.Name = types.StringValue(item.Name)
 	state.Description = types.StringValue(item.Description)
-	state.StatusCategory = types.StringValue(item.StatusCategory.Key)
+	state.StatusCategory = types.StringValue(item.statusCategoryKey())
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -253,13 +274,15 @@ func (r *statusResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	// Delete uses query param ?id=, NOT a path segment.
 	apiPath := fmt.Sprintf("/rest/api/3/statuses?id=%s", atlassian.QueryEscape(state.ID.ValueString()))
 	statusCode, err := r.client.DeleteWithStatus(ctx, apiPath)
-	if err != nil {
-		resp.Diagnostics.AddError("Error deleting status", err.Error())
+
+	// 404 means the status was already deleted out-of-band; treat as success.
+	// Jira also returns 400 "does not exist" for already-deleted statuses.
+	if statusCode == http.StatusNotFound || statusCode == http.StatusBadRequest {
 		return
 	}
 
-	// 404 means the status was already deleted out-of-band; treat as success.
-	if statusCode == http.StatusNotFound {
+	if err != nil {
+		resp.Diagnostics.AddError("Error deleting status", err.Error())
 		return
 	}
 }
