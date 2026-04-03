@@ -97,9 +97,13 @@ func testCheckProjectIssueTypeSchemeReverted(s *terraform.State) error {
 
 		allValues, err := client.GetAllPages(ctx, fmt.Sprintf("/rest/api/3/issuetypescheme/project?projectId=%s", projectID))
 		if err != nil {
-			continue
+			return fmt.Errorf("listing issue type scheme for project %s: %w", projectID, err)
 		}
 
+		// Delete must revert to the default scheme — verify an association still exists
+		// and that it is no longer the test scheme. The Cloud default is typically ID 10000
+		// but we don't hardcode it because it varies per tenant.
+		found := false
 		for _, raw := range allValues {
 			var entry struct {
 				IssueTypeScheme struct {
@@ -111,10 +115,16 @@ func testCheckProjectIssueTypeSchemeReverted(s *terraform.State) error {
 				continue
 			}
 			for _, pid := range entry.ProjectIDs {
-				if pid == projectID && entry.IssueTypeScheme.ID == testSchemeID {
-					return fmt.Errorf("project %s still has test scheme %s after destroy", projectID, testSchemeID)
+				if pid == projectID {
+					found = true
+					if entry.IssueTypeScheme.ID == testSchemeID {
+						return fmt.Errorf("project %s still has test scheme %s after destroy", projectID, testSchemeID)
+					}
 				}
 			}
+		}
+		if !found {
+			return fmt.Errorf("project %s has no issue type scheme association after destroy (expected revert to default)", projectID)
 		}
 	}
 	return nil

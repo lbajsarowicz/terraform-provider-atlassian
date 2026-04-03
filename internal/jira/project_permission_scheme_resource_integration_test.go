@@ -97,6 +97,10 @@ func testCheckProjectPermissionSchemeReverted(s *terraform.State) error {
 		if statusCode == http.StatusNotFound {
 			continue
 		}
+		// Delete must reset to the default permission scheme. We verify the test scheme is
+		// no longer assigned but don't assert a specific default ID because it varies per
+		// tenant. A future improvement could fetch the list of schemes and verify the
+		// assigned one is the first/only built-in scheme.
 		currentSchemeID := fmt.Sprintf("%d", result.ID)
 		if currentSchemeID == testSchemeID {
 			return fmt.Errorf("project %s still has test scheme %s assigned after destroy", projectKey, testSchemeID)

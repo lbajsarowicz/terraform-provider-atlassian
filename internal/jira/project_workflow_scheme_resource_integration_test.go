@@ -97,10 +97,11 @@ func testCheckProjectWorkflowSchemeStillAssigned(s *terraform.State) error {
 
 		allValues, err := client.GetAllPages(ctx, fmt.Sprintf("/rest/api/3/workflowscheme/project?projectId=%s", projectID))
 		if err != nil {
-			continue
+			return fmt.Errorf("listing workflow scheme for project %s: %w", projectID, err)
 		}
 		if len(allValues) == 0 {
-			continue
+			// Delete is documented as a no-op — the association must still exist.
+			return fmt.Errorf("workflow scheme association missing for project %s after destroy (expected no-op)", projectID)
 		}
 		var entry struct {
 			WorkflowScheme struct {
