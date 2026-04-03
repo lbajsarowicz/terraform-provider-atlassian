@@ -22,30 +22,10 @@ func TestIntegrationProjectRoleActorResource_user(t *testing.T) {
 	if err != nil {
 		t.Fatalf("creating client: %s", err)
 	}
-	ctx := context.Background()
 
-	leadAccountID, err := getTestAccountID(ctx, client)
+	leadAccountID, err := getTestAccountID(context.Background(), client)
 	if err != nil {
 		t.Fatalf("getting account ID: %s", err)
-	}
-
-	// Find the built-in "Administrators" role ID.
-	var roles []struct {
-		ID   int    `json:"id"`
-		Name string `json:"name"`
-	}
-	if err := client.Get(ctx, "/rest/api/3/role", &roles); err != nil {
-		t.Fatalf("listing roles: %s", err)
-	}
-	var adminRoleID string
-	for _, role := range roles {
-		if role.Name == "Administrators" {
-			adminRoleID = fmt.Sprintf("%d", role.ID)
-			break
-		}
-	}
-	if adminRoleID == "" {
-		t.Fatal("Administrators role not found")
 	}
 
 	resource.Test(t, resource.TestCase{
@@ -53,10 +33,10 @@ func TestIntegrationProjectRoleActorResource_user(t *testing.T) {
 		CheckDestroy:             testCheckProjectRoleActorRemoved,
 		Steps: []resource.TestStep{
 			{
-				Config: testIntegrationProjectRoleActorResourceConfig(projectKey, rName, leadAccountID, adminRoleID),
+				Config: testIntegrationProjectRoleActorResourceConfig(projectKey, rName, leadAccountID),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("atlassian_jira_project_role_actor.test", "project_key", projectKey),
-					resource.TestCheckResourceAttr("atlassian_jira_project_role_actor.test", "role_id", adminRoleID),
+					resource.TestCheckResourceAttrSet("atlassian_jira_project_role_actor.test", "role_id"),
 					resource.TestCheckResourceAttr("atlassian_jira_project_role_actor.test", "actor_type", "atlassianUser"),
 					resource.TestCheckResourceAttr("atlassian_jira_project_role_actor.test", "actor_value", leadAccountID),
 				),
@@ -65,7 +45,13 @@ func TestIntegrationProjectRoleActorResource_user(t *testing.T) {
 				ResourceName: "atlassian_jira_project_role_actor.test",
 				ImportState:  true,
 				ImportStateIdFunc: func(s *terraform.State) (string, error) {
-					return fmt.Sprintf("%s/%s/atlassianUser/%s", projectKey, adminRoleID, leadAccountID), nil
+					rs, ok := s.RootModule().Resources["atlassian_jira_project_role_actor.test"]
+					if !ok {
+						return "", fmt.Errorf("resource not found in state")
+					}
+					roleID := rs.Primary.Attributes["role_id"]
+					actorValue := rs.Primary.Attributes["actor_value"]
+					return fmt.Sprintf("%s/%s/atlassianUser/%s", projectKey, roleID, actorValue), nil
 				},
 				ImportStateVerify: true,
 			},
@@ -73,7 +59,7 @@ func TestIntegrationProjectRoleActorResource_user(t *testing.T) {
 	})
 }
 
-func testIntegrationProjectRoleActorResourceConfig(projectKey, name, leadAccountID, roleID string) string {
+func testIntegrationProjectRoleActorResourceConfig(projectKey, name, leadAccountID string) string {
 	return fmt.Sprintf(`
 resource "atlassian_jira_project" "test" {
   key              = %q
@@ -82,13 +68,17 @@ resource "atlassian_jira_project" "test" {
   lead_account_id  = %q
 }
 
+resource "atlassian_jira_project_role" "test" {
+  name = %q
+}
+
 resource "atlassian_jira_project_role_actor" "test" {
   project_key = atlassian_jira_project.test.key
-  role_id     = %q
+  role_id     = atlassian_jira_project_role.test.id
   actor_type  = "atlassianUser"
   actor_value = %q
 }
-`, projectKey, name, leadAccountID, roleID, leadAccountID)
+`, projectKey, name, leadAccountID, name+"-role", leadAccountID)
 }
 
 func testCheckProjectRoleActorRemoved(s *terraform.State) error {
@@ -114,9 +104,9 @@ func testCheckProjectRoleActorRemoved(s *terraform.State) error {
 
 		var result struct {
 			Actors []struct {
-				Type       string                                   `json:"type"`
-				ActorUser  *struct{ AccountID string `json:"accountId"` }  `json:"actorUser"`
-				ActorGroup *struct{ Name string `json:"name"` }            `json:"actorGroup"`
+				Type       string                                  `json:"type"`
+				ActorUser  *struct{ AccountID string `json:"accountId"` } `json:"actorUser"`
+				ActorGroup *struct{ Name string `json:"name"` }           `json:"actorGroup"`
 			} `json:"actors"`
 		}
 		statusCode, err := client.GetWithStatus(ctx, apiPath, &result)
