@@ -155,6 +155,11 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
+	if len(statusIDs) == 0 {
+		resp.Diagnostics.AddError("Invalid workflow configuration", "At least one status is required")
+		return
+	}
+
 	statusRefs := make([]workflowStatusCreateRef, len(statusIDs))
 	for i, id := range statusIDs {
 		statusRefs[i] = workflowStatusCreateRef{ID: id}
