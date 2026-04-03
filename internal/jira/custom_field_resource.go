@@ -275,17 +275,18 @@ func (r *customFieldResource) ImportState(ctx context.Context, req resource.Impo
 // findFieldByID fetches all fields and finds the custom field matching the given ID.
 // Returns (nil, 404, nil) if no matching custom field is found.
 func (r *customFieldResource) findFieldByID(ctx context.Context, fieldID string) (*customFieldAPIResponse, int, error) {
-	var fields []customFieldAPIResponse
-	err := r.client.Get(ctx, "/rest/api/3/field", &fields)
-	if err != nil {
+	// Use GET /rest/api/3/field/search?id={id} which is not cached (unlike GET /rest/api/3/field).
+	searchPath := fmt.Sprintf("/rest/api/3/field/search?id=%s", atlassian.QueryEscape(fieldID))
+	var searchResp struct {
+		Values []customFieldAPIResponse `json:"values"`
+	}
+	if err := r.client.Get(ctx, searchPath, &searchResp); err != nil {
 		return nil, 0, err
 	}
 
-	for i := range fields {
-		if fields[i].Custom && fields[i].ID == fieldID {
-			return &fields[i], http.StatusOK, nil
-		}
+	if len(searchResp.Values) == 0 {
+		return nil, http.StatusNotFound, nil
 	}
 
-	return nil, http.StatusNotFound, nil
+	return &searchResp.Values[0], http.StatusOK, nil
 }
