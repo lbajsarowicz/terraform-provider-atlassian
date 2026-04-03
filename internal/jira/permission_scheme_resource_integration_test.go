@@ -26,7 +26,7 @@ func init() {
 	})
 	resource.AddTestSweepers("atlassian_jira_permission_scheme", &resource.Sweeper{
 		Name:         "atlassian_jira_permission_scheme",
-		Dependencies: []string{"atlassian_jira_permission_scheme_grant"},
+		Dependencies: []string{"atlassian_jira_permission_scheme_grant", "atlassian_jira_project"},
 		F:            sweepPermissionSchemes,
 	})
 }
@@ -146,11 +146,10 @@ func TestIntegrationPermissionSchemeGrantResource_basic(t *testing.T) {
 				),
 			},
 			{
-				ResourceName:            "atlassian_jira_permission_scheme_grant.test",
-				ImportState:             true,
-				ImportStateIdFunc:       testImportPermissionSchemeGrantID("atlassian_jira_permission_scheme_grant.test"),
-				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"scheme_id"},
+				ResourceName:      "atlassian_jira_permission_scheme_grant.test",
+				ImportState:       true,
+				ImportStateIdFunc: testImportPermissionSchemeGrantID("atlassian_jira_permission_scheme_grant.test"),
+				ImportStateVerify: true,
 			},
 		},
 	})
@@ -176,20 +175,42 @@ func testCheckPermissionSchemeDestroyed(s *terraform.State) error {
 		return fmt.Errorf("creating client for destroy check: %w", err)
 	}
 	ctx := context.Background()
+
 	for _, rs := range s.RootModule().Resources {
-		if rs.Type != "atlassian_jira_permission_scheme" {
-			continue
-		}
-		var result interface{}
-		statusCode, err := client.GetWithStatus(ctx,
-			fmt.Sprintf("/rest/api/3/permissionscheme/%s", atlassian.PathEscape(rs.Primary.ID)),
-			&result,
-		)
-		if err != nil {
-			return fmt.Errorf("error checking permission scheme %s destruction: %w", rs.Primary.ID, err)
-		}
-		if statusCode != http.StatusNotFound {
-			return fmt.Errorf("permission scheme %s still exists (status %d)", rs.Primary.ID, statusCode)
+		switch rs.Type {
+		case "atlassian_jira_permission_scheme":
+			var result interface{}
+			statusCode, err := client.GetWithStatus(ctx,
+				fmt.Sprintf("/rest/api/3/permissionscheme/%s", atlassian.PathEscape(rs.Primary.ID)),
+				&result,
+			)
+			if err != nil {
+				return fmt.Errorf("error checking permission scheme %s destruction: %w", rs.Primary.ID, err)
+			}
+			if statusCode != http.StatusNotFound {
+				return fmt.Errorf("permission scheme %s still exists (status %d)", rs.Primary.ID, statusCode)
+			}
+
+		case "atlassian_jira_permission_scheme_grant":
+			schemeID := rs.Primary.Attributes["scheme_id"]
+			grantID := rs.Primary.ID
+			if schemeID == "" {
+				continue
+			}
+			var result interface{}
+			statusCode, err := client.GetWithStatus(ctx,
+				fmt.Sprintf("/rest/api/3/permissionscheme/%s/permission/%s",
+					atlassian.PathEscape(schemeID),
+					atlassian.PathEscape(grantID),
+				),
+				&result,
+			)
+			if err != nil {
+				return fmt.Errorf("error checking grant %s destruction: %w", grantID, err)
+			}
+			if statusCode != http.StatusNotFound {
+				return fmt.Errorf("permission scheme grant %s still exists (status %d)", grantID, statusCode)
+			}
 		}
 	}
 	return nil
