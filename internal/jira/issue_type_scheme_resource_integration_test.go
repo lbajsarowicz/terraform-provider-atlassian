@@ -80,6 +80,7 @@ func TestIntegrationIssueTypeSchemeResource_basic(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("atlassian_jira_issue_type_scheme.test", "name", rName),
 					resource.TestCheckResourceAttrSet("atlassian_jira_issue_type_scheme.test", "id"),
+					resource.TestCheckResourceAttr("atlassian_jira_issue_type_scheme.test", "issue_type_ids.#", "1"),
 				),
 			},
 			{

@@ -72,6 +72,7 @@ func TestIntegrationWorkflowResource_basic(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("atlassian_jira_workflow.test", "name", rName),
 					resource.TestCheckResourceAttrSet("atlassian_jira_workflow.test", "id"),
+					resource.TestCheckResourceAttr("atlassian_jira_workflow.test", "statuses.#", "1"),
 				),
 			},
 			{
