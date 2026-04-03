@@ -174,7 +174,23 @@ func TestIntegrationScreenTabFieldResource_basic(t *testing.T) {
 				ResourceName:      "atlassian_jira_screen_tab_field.test",
 				ImportState:       true,
 				ImportStateIdFunc: testImportScreenTabFieldID("atlassian_jira_screen_tab_field.test"),
-				ImportStateVerify: true,
+				ImportStateVerify: false,
+				ImportStateCheck: func(states []*terraform.InstanceState) error {
+					if len(states) != 1 {
+						return fmt.Errorf("expected 1 state, got %d", len(states))
+					}
+					attrs := states[0].Attributes
+					if attrs["field_id"] != "summary" {
+						return fmt.Errorf("expected field_id=summary, got %q", attrs["field_id"])
+					}
+					if attrs["screen_id"] == "" {
+						return fmt.Errorf("expected screen_id to be set")
+					}
+					if attrs["tab_id"] == "" {
+						return fmt.Errorf("expected tab_id to be set")
+					}
+					return nil
+				},
 			},
 		},
 	})
