@@ -85,18 +85,22 @@ func (d *customFieldDataSource) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	// List all fields and find the custom field by name.
-	var fields []customFieldAPIResponse
-	err := d.client.Get(ctx, "/rest/api/3/field", &fields)
+	// Use GET /rest/api/3/field/search which is not cached (unlike GET /rest/api/3/field).
+	// The query param is a fuzzy search, so we filter for exact name match client-side.
+	name := config.Name.ValueString()
+	searchPath := fmt.Sprintf("/rest/api/3/field/search?query=%s&type=custom", atlassian.QueryEscape(name))
+	var searchResp struct {
+		Values []customFieldAPIResponse `json:"values"`
+	}
+	err := d.client.Get(ctx, searchPath, &searchResp)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading fields", err.Error())
 		return
 	}
 
-	name := config.Name.ValueString()
 	var matched []customFieldAPIResponse
-	for _, f := range fields {
-		if f.Custom && f.Name == name {
+	for _, f := range searchResp.Values {
+		if f.Name == name {
 			matched = append(matched, f)
 		}
 	}

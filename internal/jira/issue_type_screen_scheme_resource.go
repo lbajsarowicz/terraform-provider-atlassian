@@ -52,8 +52,9 @@ type issueTypeScreenSchemeCreateRequest struct {
 }
 
 // issueTypeScreenSchemeCreateResponse represents the POST response body.
+// The API returns {"id": "..."}, not {"issueTypeScreenSchemeId": "..."}.
 type issueTypeScreenSchemeCreateResponse struct {
-	IssueTypeScreenSchemeID string `json:"issueTypeScreenSchemeId"`
+	ID string `json:"id"`
 }
 
 // issueTypeScreenSchemeUpdateRequest represents the PUT request body for name/description updates.
@@ -160,7 +161,7 @@ func (r *issueTypeScreenSchemeResource) Create(ctx context.Context, req resource
 		return
 	}
 
-	plan.ID = types.StringValue(result.IssueTypeScreenSchemeID)
+	plan.ID = types.StringValue(result.ID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
