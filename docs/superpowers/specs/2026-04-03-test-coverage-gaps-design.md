@@ -132,7 +132,7 @@ No standalone sweepers for association resources. Project sweeper handles cleanu
 - Fetches authenticated user's account ID via `GET /rest/api/3/myself`
 - Looks up the built-in "Administrators" role via `GET /rest/api/3/role` to get its ID
 - Adds user as actor to the project role
-- Steps: create + verify attributes (`actor_type`, `actor_value`, `project_key`, `role_id`), import with composite ID `{projectKey}/{roleId}/atlassianUser/{accountId}`
+- Steps: create + verify attributes (`actor_type`, `actor_value`, `project_key`, `role_id`), import with composite ID `{projectKey}/{roleId}/{actorType}/{actorValue}` where `actorType` is the literal string `atlassianUser` or `atlassianGroup` (e.g. `MYPROJ/10100/atlassianUser/5a1234abc`)
 - Destroy check: `GET /rest/api/3/project/{key}/role/{roleId}`, iterate actors array, verify the test user's actor entry is removed
 - No standalone sweeper — actors are cleaned up when projects are swept
 
@@ -213,6 +213,14 @@ All unit test mocks must match Go struct types:
 - `int`, `int64` fields → JSON integer (not string)
 - `string` fields → JSON string
 - `json.Number` fields → JSON number (integer or string both work)
+
+### Paginated Mock Responses
+Mocks serving paginated endpoints (`GetAllPages`) must include `"isLast": true` in the response. Without this, `GetAllPages` loops indefinitely and tests hang. For single-page mocks: `{"values": [...], "startAt": 0, "maxResults": 50, "total": N, "isLast": true}`.
+
+### Non-Standard Response Keys
+Some Jira endpoints use non-standard response keys:
+- `GET /rest/api/3/permissionscheme` returns `{"permissionSchemes": [...]}` (not `{"values": [...]}`)
+- Mock servers for `project_permission_scheme` Delete (which calls this endpoint to find the default scheme) must use the `permissionSchemes` key or the list will deserialize as empty, leaving the default-scheme-detection path untested.
 
 ### Integration Test Resource Naming
 All test resources use `tf-acc-test-` prefix for sweeper filtering. Project keys use `TFACC` prefix + random uppercase letters.
