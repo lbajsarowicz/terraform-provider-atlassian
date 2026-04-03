@@ -72,7 +72,44 @@ func TestAccProjectIssueTypeSchemeResource_basic(t *testing.T) {
 	projectID := "10300"
 	schemeID := "10100"
 
-	mockServer := newProjectIssueTypeSchemeMockServer(projectID, schemeID)
+	var mu sync.Mutex
+	currentSchemeID := schemeID
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case r.Method == "PUT" && r.URL.Path == "/rest/api/3/issuetypescheme/project":
+			var body struct {
+				IssueTypeSchemeID string `json:"issueTypeSchemeId"`
+				ProjectID         string `json:"projectId"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			mu.Lock()
+			currentSchemeID = body.IssueTypeSchemeID
+			mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+
+		case r.Method == "GET" && r.URL.Path == "/rest/api/3/issuetypescheme/project":
+			mu.Lock()
+			sid := currentSchemeID
+			mu.Unlock()
+			json.NewEncoder(w).Encode(pageResponse([]interface{}{ //nolint:errcheck
+				map[string]interface{}{
+					"issueTypeScheme": map[string]interface{}{
+						"id": sid, "name": "Test Scheme", "description": "", "isDefault": false,
+					},
+					"projectIds": []string{projectID},
+				},
+			}))
+
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
 	defer mockServer.Close()
 
 	t.Setenv("ATLASSIAN_URL", mockServer.URL)
@@ -82,6 +119,12 @@ func TestAccProjectIssueTypeSchemeResource_basic(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
 		CheckDestroy: func(s *terraform.State) error {
+			mu.Lock()
+			sid := currentSchemeID
+			mu.Unlock()
+			if sid != "10000" {
+				return fmt.Errorf("expected scheme to revert to default 10000, got %s", sid)
+			}
 			return nil
 		},
 		Steps: []resource.TestStep{
