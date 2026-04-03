@@ -363,25 +363,28 @@ func TestAccCustomFieldDataSource_basic(t *testing.T) {
 	name := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" && r.URL.Path == "/rest/api/3/field" {
+		if r.Method == "GET" && r.URL.Path == "/rest/api/3/field/search" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode([]map[string]interface{}{ //nolint:errcheck
-				{
-					"id":          testFieldID,
-					"name":        name,
-					"custom":      true,
-					"description": "A data source test field",
-					"searcherKey": testFieldSearcher,
-					"schema": map[string]interface{}{
-						"type":     "string",
-						"custom":   testFieldType,
-						"customId": testFieldCustomID,
+			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+				"values": []map[string]interface{}{
+					{
+						"id":          testFieldID,
+						"name":        name,
+						"custom":      true,
+						"description": "A data source test field",
+						"searcherKey": testFieldSearcher,
+						"schema": map[string]interface{}{
+							"type":     "string",
+							"custom":   testFieldType,
+							"customId": testFieldCustomID,
+						},
 					},
-				},
-				{
-					"id":     "issuetype",
-					"name":   "Issue Type",
-					"custom": false,
+					{
+						"id":     "customfield_10999",
+						"name":   name + "-other",
+						"custom": true,
+						"schema": map[string]interface{}{"type": "string", "custom": testFieldType, "customId": int64(10999)},
+					},
 				},
 			})
 			return
@@ -416,14 +419,10 @@ func TestAccCustomFieldDataSource_NotFound(t *testing.T) {
 	name := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" && r.URL.Path == "/rest/api/3/field" {
+		if r.Method == "GET" && r.URL.Path == "/rest/api/3/field/search" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode([]map[string]interface{}{ //nolint:errcheck
-				{
-					"id":     "issuetype",
-					"name":   "Issue Type",
-					"custom": false,
-				},
+			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+				"values": []map[string]interface{}{},
 			})
 			return
 		}
@@ -451,20 +450,22 @@ func TestAccCustomFieldDataSource_AmbiguousName(t *testing.T) {
 	name := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" && r.URL.Path == "/rest/api/3/field" {
+		if r.Method == "GET" && r.URL.Path == "/rest/api/3/field/search" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode([]map[string]interface{}{ //nolint:errcheck
-				{
-					"id":     "customfield_10100",
-					"name":   name,
-					"custom": true,
-					"schema": map[string]interface{}{"type": "string", "custom": testFieldType, "customId": testFieldCustomID},
-				},
-				{
-					"id":     "customfield_10101",
-					"name":   name,
-					"custom": true,
-					"schema": map[string]interface{}{"type": "string", "custom": testFieldType, "customId": int64(10101)},
+			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+				"values": []map[string]interface{}{
+					{
+						"id":     "customfield_10100",
+						"name":   name,
+						"custom": true,
+						"schema": map[string]interface{}{"type": "string", "custom": testFieldType, "customId": testFieldCustomID},
+					},
+					{
+						"id":     "customfield_10101",
+						"name":   name,
+						"custom": true,
+						"schema": map[string]interface{}{"type": "string", "custom": testFieldType, "customId": int64(10101)},
+					},
 				},
 			})
 			return
