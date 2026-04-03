@@ -185,21 +185,27 @@ func testCheckStatusDestroyed(s *terraform.State) error {
 		return fmt.Errorf("creating client for destroy check: %w", err)
 	}
 	ctx := context.Background()
+	// The search endpoint ignores the ?id= param, so we must paginate
+	// through all statuses and check for a match.
+	allValues, listErr := client.GetAllPages(ctx, "/rest/api/3/statuses/search")
+	if listErr != nil {
+		return fmt.Errorf("error listing statuses for destroy check: %w", listErr)
+	}
+	statusIDs := make(map[string]bool)
+	for _, raw := range allValues {
+		var status struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(raw, &status); err != nil {
+			continue
+		}
+		statusIDs[status.ID] = true
+	}
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "atlassian_jira_status" {
 			continue
 		}
-		var result struct {
-			Values []struct {
-				ID string `json:"id"`
-			} `json:"values"`
-		}
-		searchPath := fmt.Sprintf("/rest/api/3/statuses/search?id=%s&maxResults=1",
-			atlassian.QueryEscape(rs.Primary.ID))
-		if err := client.Get(ctx, searchPath, &result); err != nil {
-			return fmt.Errorf("error checking status %s destruction: %w", rs.Primary.ID, err)
-		}
-		if len(result.Values) > 0 {
+		if statusIDs[rs.Primary.ID] {
 			return fmt.Errorf("status %s still exists", rs.Primary.ID)
 		}
 	}

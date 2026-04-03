@@ -82,7 +82,7 @@ func (d *workflowDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	apiPath := fmt.Sprintf("/rest/api/3/workflow/search?workflowName=%s", atlassian.QueryEscape(config.Name.ValueString()))
+	apiPath := fmt.Sprintf("/rest/api/3/workflow/search?workflowName=%s&expand=statuses", atlassian.QueryEscape(config.Name.ValueString()))
 
 	var searchResp workflowSearchResponse
 	statusCode, err := d.client.GetWithStatus(ctx, apiPath, &searchResp)
@@ -102,14 +102,14 @@ func (d *workflowDataSource) Read(ctx context.Context, req datasource.ReadReques
 	// Find the workflow by name in the response
 	name := config.Name.ValueString()
 	for _, wf := range searchResp.Values {
-		if wf.Name == name {
+		if wf.ID.Name == name {
 			config.ID = types.StringValue(wf.ID.EntityID)
 			config.Description = types.StringValue(wf.Description)
 
-			// Use StatusReference to be consistent with the resource's create path.
+			// Use numeric status ID to be consistent with the resource's create path.
 			statusRefs := make([]string, len(wf.Statuses))
 			for i, s := range wf.Statuses {
-				statusRefs[i] = s.StatusReference
+				statusRefs[i] = s.ID
 			}
 
 			statusList, diags := types.ListValueFrom(ctx, types.StringType, statusRefs)
