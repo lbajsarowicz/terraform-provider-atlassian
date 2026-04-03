@@ -16,8 +16,9 @@ import (
 
 func init() {
 	resource.AddTestSweepers("atlassian_jira_issue_type", &resource.Sweeper{
-		Name: "atlassian_jira_issue_type",
-		F:    sweepIssueTypes,
+		Name:         "atlassian_jira_issue_type",
+		Dependencies: []string{"atlassian_jira_issue_type_scheme"},
+		F:            sweepIssueTypes,
 	})
 }
 
