@@ -230,7 +230,7 @@ func testCheckProjectRoleDestroyed(s *terraform.State) error {
 	return nil
 }
 
-// testCheckProjectRoleActorDestroyed verifies both the actor and the project are gone.
+// testCheckProjectRoleActorDestroyed verifies the actor, role, group, and project are gone.
 func testCheckProjectRoleActorDestroyed(s *terraform.State) error {
 	client, err := testutil.SweepClient()
 	if err != nil {
@@ -239,30 +239,42 @@ func testCheckProjectRoleActorDestroyed(s *terraform.State) error {
 	ctx := context.Background()
 
 	for _, rs := range s.RootModule().Resources {
-		if rs.Type == "atlassian_jira_project" {
+		switch rs.Type {
+		case "atlassian_jira_project":
 			var result interface{}
-			statusCode, err := client.GetWithStatus(ctx,
+			statusCode, getErr := client.GetWithStatus(ctx,
 				fmt.Sprintf("/rest/api/3/project/%s", atlassian.PathEscape(rs.Primary.Attributes["key"])),
 				&result,
 			)
-			if err != nil {
-				return fmt.Errorf("error checking project destruction: %w", err)
+			if getErr != nil {
+				return fmt.Errorf("error checking project destruction: %w", getErr)
 			}
 			if statusCode != http.StatusNotFound {
 				return fmt.Errorf("project %s still exists (status %d)", rs.Primary.Attributes["key"], statusCode)
 			}
-		}
-		if rs.Type == "atlassian_jira_project_role" {
+		case "atlassian_jira_project_role":
 			var result interface{}
-			statusCode, err := client.GetWithStatus(ctx,
+			statusCode, getErr := client.GetWithStatus(ctx,
 				fmt.Sprintf("/rest/api/3/role/%s", atlassian.PathEscape(rs.Primary.ID)),
 				&result,
 			)
-			if err != nil {
-				return fmt.Errorf("error checking project role destruction: %w", err)
+			if getErr != nil {
+				return fmt.Errorf("error checking project role destruction: %w", getErr)
 			}
 			if statusCode != http.StatusNotFound {
 				return fmt.Errorf("project role %s still exists (status %d)", rs.Primary.ID, statusCode)
+			}
+		case "atlassian_jira_group":
+			var result interface{}
+			statusCode, getErr := client.GetWithStatus(ctx,
+				fmt.Sprintf("/rest/api/3/group?groupId=%s", atlassian.QueryEscape(rs.Primary.Attributes["group_id"])),
+				&result,
+			)
+			if getErr != nil {
+				return fmt.Errorf("error checking group destruction: %w", getErr)
+			}
+			if statusCode != http.StatusNotFound {
+				return fmt.Errorf("group %s still exists (status %d)", rs.Primary.Attributes["group_id"], statusCode)
 			}
 		}
 	}
