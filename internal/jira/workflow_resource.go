@@ -39,39 +39,41 @@ type workflowResourceModel struct {
 
 // API request/response types
 
+// workflowCreateRequest represents the POST /rest/api/3/workflow request body.
+// Uses the legacy (non-versioned) workflow API which accepts status IDs directly.
 type workflowCreateRequest struct {
-	Name        string              `json:"name"`
-	Description string              `json:"description,omitempty"`
-	Statuses    []workflowStatusRef `json:"statuses"`
-	Transitions []interface{}       `json:"transitions"`
+	Name        string                    `json:"name"`
+	Description string                    `json:"description,omitempty"`
+	Statuses    []workflowStatusCreateRef `json:"statuses"`
+	Transitions []workflowTransitionRef   `json:"transitions"`
 }
 
-type workflowStatusRef struct {
-	StatusReference string         `json:"statusReference"`
-	Layout          workflowLayout `json:"layout"`
+type workflowStatusCreateRef struct {
+	ID string `json:"id"`
 }
 
-type workflowLayout struct {
-	X float64 `json:"x"`
-	Y float64 `json:"y"`
-}
-
-type workflowCreateResponse struct {
-	ID struct {
-		EntityID string `json:"entityId"`
-	} `json:"id"`
+type workflowTransitionRef struct {
 	Name string `json:"name"`
+	To   string `json:"to"`
+	Type string `json:"type"`
+}
+
+// workflowCreateResponse represents the POST /rest/api/3/workflow response.
+// The old endpoint returns entityId at the top level (not nested under id).
+type workflowCreateResponse struct {
+	EntityID string `json:"entityId"`
+	Name     string `json:"name"`
 }
 
 type workflowAPIItem struct {
 	ID struct {
+		Name     string `json:"name"`
 		EntityID string `json:"entityId"`
 	} `json:"id"`
-	Name        string `json:"name"`
 	Description string `json:"description"`
 	Statuses    []struct {
-		ID              string `json:"id"`
-		StatusReference string `json:"statusReference"`
+		ID   string `json:"id"`
+		Name string `json:"name"`
 	} `json:"statuses"`
 }
 
@@ -153,30 +155,38 @@ func (r *workflowResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	statusRefs := make([]workflowStatusRef, len(statusIDs))
+	if len(statusIDs) == 0 {
+		resp.Diagnostics.AddError("Invalid workflow configuration", "At least one status is required")
+		return
+	}
+
+	statusRefs := make([]workflowStatusCreateRef, len(statusIDs))
 	for i, id := range statusIDs {
-		statusRefs[i] = workflowStatusRef{
-			StatusReference: id,
-			Layout:          workflowLayout{X: 0.0, Y: 0.0},
-		}
+		statusRefs[i] = workflowStatusCreateRef{ID: id}
+	}
+
+	// The legacy workflow API requires at least one initial transition.
+	// Create an initial transition pointing to the first status.
+	transitions := []workflowTransitionRef{
+		{Name: "Create", To: statusIDs[0], Type: "initial"},
 	}
 
 	body := workflowCreateRequest{
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueString(),
 		Statuses:    statusRefs,
-		Transitions: []interface{}{},
+		Transitions: transitions,
 	}
 
 	var result workflowCreateResponse
-	err := r.client.Post(ctx, "/rest/api/3/workflow/create", body, &result)
+	err := r.client.Post(ctx, "/rest/api/3/workflow", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating workflow", err.Error())
 		return
 	}
 
 	// Only take the ID from the response; preserve all other plan values.
-	plan.ID = types.StringValue(result.ID.EntityID)
+	plan.ID = types.StringValue(result.EntityID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -192,9 +202,10 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 	// a name filter so we can locate the workflow by entity ID across the results.
 	var apiPath string
 	if state.Name.ValueString() != "" {
-		apiPath = fmt.Sprintf("/rest/api/3/workflow/search?workflowName=%s", atlassian.QueryEscape(state.Name.ValueString()))
+		apiPath = fmt.Sprintf("/rest/api/3/workflow/search?workflowName=%s&expand=statuses",
+			atlassian.QueryEscape(state.Name.ValueString()))
 	} else {
-		apiPath = "/rest/api/3/workflow/search"
+		apiPath = "/rest/api/3/workflow/search?expand=statuses"
 	}
 
 	var searchResp workflowSearchResponse
@@ -224,14 +235,15 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 
 	state.ID = types.StringValue(found.ID.EntityID)
-	state.Name = types.StringValue(found.Name)
+	state.Name = types.StringValue(found.ID.Name)
 	state.Description = types.StringValue(found.Description)
 
-	// Extract status references from the API response. Use StatusReference (the
-	// value that was sent on create) to keep state consistent with configuration.
+	// Extract status IDs from the API response. Use the numeric ID (which
+	// matches what was sent to POST /rest/api/3/workflow on create) rather
+	// than StatusReference (a UUID assigned by the server).
 	statusRefs := make([]string, len(found.Statuses))
 	for i, s := range found.Statuses {
-		statusRefs[i] = s.StatusReference
+		statusRefs[i] = s.ID
 	}
 
 	statusList, diags := types.ListValueFrom(ctx, types.StringType, statusRefs)
@@ -259,7 +271,7 @@ func (r *workflowResource) Delete(ctx context.Context, req resource.DeleteReques
 		return
 	}
 
-	apiPath := "/rest/api/3/workflow?workflowId=" + atlassian.QueryEscape(state.ID.ValueString())
+	apiPath := fmt.Sprintf("/rest/api/3/workflow/%s", atlassian.PathEscape(state.ID.ValueString()))
 	statusCode, err := r.client.DeleteWithStatus(ctx, apiPath)
 	if err != nil {
 		resp.Diagnostics.AddError("Error deleting workflow", err.Error())
