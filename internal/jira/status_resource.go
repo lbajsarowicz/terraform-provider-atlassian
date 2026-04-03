@@ -158,7 +158,12 @@ func (r *statusResource) Create(ctx context.Context, req resource.CreateRequest,
 		Scope: statusScope{Type: "GLOBAL"},
 	}
 
-	var result []statusAPIItem
+	// POST response returns statusCategory as a flat string (e.g., "TODO"),
+	// while GET returns it as a nested object {"key": "TODO"}. Use a minimal
+	// response type that only captures the ID we need.
+	var result []struct {
+		ID string `json:"id"`
+	}
 	err := r.client.Post(ctx, "/rest/api/3/statuses", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating status", err.Error())
