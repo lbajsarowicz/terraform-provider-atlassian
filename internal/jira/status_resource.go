@@ -51,6 +51,11 @@ type statusAPIItem struct {
 
 type statusCreateRequest struct {
 	Statuses []statusCreateItem `json:"statuses"`
+	Scope    statusScope        `json:"scope"`
+}
+
+type statusScope struct {
+	Type string `json:"type"`
 }
 
 type statusCreateItem struct {
@@ -150,6 +155,7 @@ func (r *statusResource) Create(ctx context.Context, req resource.CreateRequest,
 				StatusCategory: plan.StatusCategory.ValueString(),
 			},
 		},
+		Scope: statusScope{Type: "GLOBAL"},
 	}
 
 	var result []statusAPIItem
