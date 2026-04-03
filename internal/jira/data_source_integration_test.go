@@ -15,6 +15,7 @@ func TestIntegrationPermissionSchemeDataSource_basic(t *testing.T) {
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
+		CheckDestroy:             testCheckPermissionSchemeDestroyed,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(`
@@ -45,6 +46,7 @@ func TestIntegrationScreenDataSource_basic(t *testing.T) {
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
+		CheckDestroy:             testCheckScreenDestroyed,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(`
