@@ -105,7 +105,7 @@ func newIssueTypeScreenSchemeMockServer(state *issueTypeScreenSchemeMockState) *
 			state.set(fixedID, body.Name, body.Description, mappings)
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(map[string]string{
-				"issueTypeScreenSchemeId": fixedID,
+				"id": fixedID,
 			})
 
 		// List (for Read)
@@ -383,7 +383,7 @@ func TestAccIssueTypeScreenSchemeResource_notFound(t *testing.T) {
 			state.set(fixedID, body.Name, body.Description, mappings)
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(map[string]string{
-				"issueTypeScreenSchemeId": fixedID,
+				"id": fixedID,
 			})
 
 		case r.Method == "GET" && r.URL.Path == "/rest/api/3/issuetypescreenscheme":

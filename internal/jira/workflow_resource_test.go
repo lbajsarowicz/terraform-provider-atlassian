@@ -65,8 +65,8 @@ func (s *workflowMockState) apiItem() map[string]interface{} {
 	return map[string]interface{}{
 		"id": map[string]interface{}{
 			"entityId": s.entityID,
+			"name":     s.name,
 		},
-		"name":        s.name,
 		"description": s.description,
 		"statuses":    statusList,
 		"transitions": []interface{}{},
@@ -76,12 +76,12 @@ func (s *workflowMockState) apiItem() map[string]interface{} {
 func newWorkflowMockServer(state *workflowMockState) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == "POST" && r.URL.Path == "/rest/api/3/workflow/create":
+		case r.Method == "POST" && r.URL.Path == "/rest/api/3/workflow":
 			var body struct {
 				Name        string `json:"name"`
 				Description string `json:"description"`
 				Statuses    []struct {
-					StatusReference string `json:"statusReference"`
+					ID string `json:"id"`
 				} `json:"statuses"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -90,16 +90,14 @@ func newWorkflowMockServer(state *workflowMockState) *httptest.Server {
 			}
 			statusIDs := make([]string, len(body.Statuses))
 			for i, s := range body.Statuses {
-				statusIDs[i] = s.StatusReference
+				statusIDs[i] = s.ID
 			}
 			state.set(workflowFixedEntityID, body.Name, body.Description, statusIDs)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(map[string]interface{}{
-				"id": map[string]interface{}{
-					"entityId": workflowFixedEntityID,
-				},
-				"name": body.Name,
+				"entityId": workflowFixedEntityID,
+				"name":     body.Name,
 			})
 
 		case r.Method == "GET" && r.URL.Path == "/rest/api/3/workflow/search":
@@ -116,10 +114,10 @@ func newWorkflowMockServer(state *workflowMockState) *httptest.Server {
 				"values": []interface{}{state.apiItem()},
 			})
 
-		case r.Method == "DELETE" && r.URL.Path == "/rest/api/3/workflow":
-			wfID := r.URL.Query().Get("workflowId")
+		case r.Method == "DELETE":
 			entityID, _, _, _ := state.get()
-			if wfID != entityID || entityID == "" {
+			expectedPath := "/rest/api/3/workflow/" + entityID
+			if r.URL.Path != expectedPath || entityID == "" {
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
@@ -177,12 +175,12 @@ func TestAccWorkflowResource_Read_NotFound(t *testing.T) {
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == "POST" && r.URL.Path == "/rest/api/3/workflow/create":
+		case r.Method == "POST" && r.URL.Path == "/rest/api/3/workflow":
 			var body struct {
 				Name        string `json:"name"`
 				Description string `json:"description"`
 				Statuses    []struct {
-					StatusReference string `json:"statusReference"`
+					ID string `json:"id"`
 				} `json:"statuses"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -191,16 +189,14 @@ func TestAccWorkflowResource_Read_NotFound(t *testing.T) {
 			}
 			statusIDs := make([]string, len(body.Statuses))
 			for i, s := range body.Statuses {
-				statusIDs[i] = s.StatusReference
+				statusIDs[i] = s.ID
 			}
 			state.set(workflowFixedEntityID, body.Name, body.Description, statusIDs)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(map[string]interface{}{
-				"id": map[string]interface{}{
-					"entityId": workflowFixedEntityID,
-				},
-				"name": body.Name,
+				"entityId": workflowFixedEntityID,
+				"name":     body.Name,
 			})
 
 		case r.Method == "GET" && r.URL.Path == "/rest/api/3/workflow/search":
@@ -223,7 +219,7 @@ func TestAccWorkflowResource_Read_NotFound(t *testing.T) {
 				})
 			}
 
-		case r.Method == "DELETE" && r.URL.Path == "/rest/api/3/workflow":
+		case r.Method == "DELETE":
 			w.WriteHeader(http.StatusNoContent)
 
 		default:
