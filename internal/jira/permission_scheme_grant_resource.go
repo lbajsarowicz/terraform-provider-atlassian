@@ -272,5 +272,7 @@ func (r *permissionSchemeGrantResource) ImportState(ctx context.Context, req res
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("holder_type"), result.Holder.Type)...)
 	if result.Holder.Parameter != "" {
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("holder_parameter"), result.Holder.Parameter)...)
+	} else {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("holder_parameter"), types.StringNull())...)
 	}
 }
