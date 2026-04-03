@@ -41,6 +41,7 @@ func getAtlassianUserAccountID(ctx context.Context, client *atlassian.Client) (s
 
 func TestIntegrationConfluenceSpacePermissionResource_basic(t *testing.T) {
 	testutil.SkipIfNoAcc(t)
+	testutil.SkipIfNoConfluencePermissions(t)
 
 	rKey, rName := newSpaceTestIDs()
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -38,17 +39,28 @@ type spaceResourceModel struct {
 	Description types.String `tfsdk:"description"`
 }
 
-// spaceV2Response is the Confluence v2 API space representation.
-type spaceV2Response struct {
+// spaceCreateV2Response is the response from POST /wiki/api/v2/spaces.
+// Description uses a nested format: description.plain.value
+type spaceCreateV2Response struct {
+	ID  json.Number `json:"id"`
+	Key string      `json:"key"`
+}
+
+// spaceV1Response is the response from GET /wiki/rest/api/space/{key}?expand=description.plain.
+// The v1 API returns description correctly; v2 GET returns an empty description object.
+type spaceV1Response struct {
 	ID          json.Number `json:"id"`
 	Key         string      `json:"key"`
 	Name        string      `json:"name"`
 	Description *struct {
-		Value string `json:"value"`
+		Plain *struct {
+			Value string `json:"value"`
+		} `json:"plain"`
 	} `json:"description"`
 }
 
 // spaceCreateRequest is the body for POST /wiki/api/v2/spaces.
+// The description format in the POST body is flat: {value, representation}.
 type spaceCreateRequest struct {
 	Key         string `json:"key"`
 	Name        string `json:"name"`
@@ -59,6 +71,7 @@ type spaceCreateRequest struct {
 }
 
 // spaceUpdateRequest is the body for PUT /wiki/rest/api/space/{key} (v1).
+// The v1 update uses nested description: description.plain.{value, representation}.
 type spaceUpdateRequest struct {
 	Key         string `json:"key"`
 	Name        string `json:"name"`
@@ -142,20 +155,28 @@ func (r *spaceResource) Create(ctx context.Context, req resource.CreateRequest, 
 	body.Description.Value = plan.Description.ValueString()
 	body.Description.Representation = "plain"
 
-	var result spaceV2Response
-	if err := r.client.Post(ctx, "/wiki/api/v2/spaces", body, &result); err != nil {
+	var createResult spaceCreateV2Response
+	if err := r.client.Post(ctx, "/wiki/api/v2/spaces", body, &createResult); err != nil {
 		resp.Diagnostics.AddError("Error creating Confluence space", err.Error())
 		return
 	}
 
-	plan.ID = types.StringValue(result.ID.String())
-	plan.Key = types.StringValue(result.Key)
-	plan.Name = types.StringValue(result.Name)
-	if result.Description != nil {
-		plan.Description = types.StringValue(result.Description.Value)
-	} else {
-		plan.Description = types.StringValue("")
+	// The v2 GET response returns an empty description object; use v1 to read
+	// the actual stored state including description.
+	space, statusCode, err := r.readSpaceV1(ctx, createResult.Key)
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading Confluence space after create", err.Error())
+		return
 	}
+	if statusCode == http.StatusNotFound {
+		resp.Diagnostics.AddError("Error reading Confluence space after create", "space not found immediately after creation")
+		return
+	}
+
+	plan.ID = types.StringValue(space.ID.String())
+	plan.Key = types.StringValue(space.Key)
+	plan.Name = types.StringValue(space.Name)
+	plan.Description = types.StringValue(descriptionValue(space))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -167,7 +188,27 @@ func (r *spaceResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	space, statusCode, err := r.readSpaceByID(ctx, state.ID.ValueString())
+	key := state.Key.ValueString()
+
+	// After import, key may be empty; look it up from the space ID via v2.
+	if key == "" {
+		var v2result struct {
+			Key string `json:"key"`
+		}
+		apiPath := fmt.Sprintf("/wiki/api/v2/spaces/%s", atlassian.PathEscape(state.ID.ValueString()))
+		statusCode, err := r.client.GetWithStatus(ctx, apiPath, &v2result)
+		if err != nil {
+			resp.Diagnostics.AddError("Error reading Confluence space", err.Error())
+			return
+		}
+		if statusCode == http.StatusNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		key = v2result.Key
+	}
+
+	space, statusCode, err := r.readSpaceV1(ctx, key)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading Confluence space", err.Error())
 		return
@@ -180,11 +221,7 @@ func (r *spaceResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	state.ID = types.StringValue(space.ID.String())
 	state.Key = types.StringValue(space.Key)
 	state.Name = types.StringValue(space.Name)
-	if space.Description != nil {
-		state.Description = types.StringValue(space.Description.Value)
-	} else {
-		state.Description = types.StringValue("")
-	}
+	state.Description = types.StringValue(descriptionValue(space))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -216,8 +253,8 @@ func (r *spaceResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	// Re-read via v2 to populate fresh state
-	space, statusCode, err := r.readSpaceByID(ctx, state.ID.ValueString())
+	// Re-read via v1 to populate fresh state.
+	space, statusCode, err := r.readSpaceV1(ctx, key)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading Confluence space after update", err.Error())
 		return
@@ -230,11 +267,7 @@ func (r *spaceResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	plan.ID = state.ID
 	plan.Key = types.StringValue(space.Key)
 	plan.Name = types.StringValue(space.Name)
-	if space.Description != nil {
-		plan.Description = types.StringValue(space.Description.Value)
-	} else {
-		plan.Description = types.StringValue("")
-	}
+	plan.Description = types.StringValue(descriptionValue(space))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -273,7 +306,13 @@ func (r *spaceResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 			// No task link; assume deletion succeeded.
 			return
 		}
-		if err := r.client.PollLongTask(ctx, taskRef.Links.Status); err != nil {
+		// The Confluence API returns longtask paths without the /wiki context prefix
+		// (e.g. "/rest/api/longtask/123" instead of "/wiki/rest/api/longtask/123").
+		taskPath := taskRef.Links.Status
+		if strings.HasPrefix(taskPath, "/rest/api/longtask") {
+			taskPath = "/wiki" + taskPath
+		}
+		if err := r.client.PollLongTask(ctx, taskPath); err != nil {
 			resp.Diagnostics.AddError("Error waiting for Confluence space deletion", err.Error())
 			return
 		}
@@ -290,12 +329,11 @@ func (r *spaceResource) ImportState(ctx context.Context, req resource.ImportStat
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// readSpaceByID fetches a Confluence space by its numeric ID via the v2 API.
+// readSpaceV1 fetches a Confluence space by key using the v1 API with description expansion.
 // Returns (nil, 404, nil) if the space is not found.
-func (r *spaceResource) readSpaceByID(ctx context.Context, spaceID string) (*spaceV2Response, int, error) {
-	apiPath := fmt.Sprintf("/wiki/api/v2/spaces/%s", atlassian.PathEscape(spaceID))
-
-	var result spaceV2Response
+func (r *spaceResource) readSpaceV1(ctx context.Context, key string) (*spaceV1Response, int, error) {
+	apiPath := fmt.Sprintf("/wiki/rest/api/space/%s?expand=description.plain", atlassian.PathEscape(key))
+	var result spaceV1Response
 	statusCode, err := r.client.GetWithStatus(ctx, apiPath, &result)
 	if err != nil {
 		return nil, statusCode, err
@@ -304,4 +342,12 @@ func (r *spaceResource) readSpaceByID(ctx context.Context, spaceID string) (*spa
 		return nil, http.StatusNotFound, nil
 	}
 	return &result, statusCode, nil
+}
+
+// descriptionValue extracts the plain description value from a v1 space response.
+func descriptionValue(s *spaceV1Response) string {
+	if s.Description != nil && s.Description.Plain != nil {
+		return s.Description.Plain.Value
+	}
+	return ""
 }

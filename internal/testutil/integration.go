@@ -15,6 +15,15 @@ var AllowedSweepHosts = map[string]bool{
 	"lbajsarowicz.atlassian.net": true,
 }
 
+// SkipIfNoConfluencePermissions skips the test unless ATLASSIAN_CONFLUENCE_PAID=1 is set.
+// Confluence space permission management requires a paid Confluence plan.
+func SkipIfNoConfluencePermissions(t *testing.T) {
+	t.Helper()
+	if os.Getenv("ATLASSIAN_CONFLUENCE_PAID") != "1" {
+		t.Skip("ATLASSIAN_CONFLUENCE_PAID not set; space permission API requires a paid Confluence plan")
+	}
+}
+
 // SkipIfNoAcc skips the test unless TF_ACC=1 is set.
 func SkipIfNoAcc(t *testing.T) {
 	t.Helper()

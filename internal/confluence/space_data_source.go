@@ -3,6 +3,7 @@ package confluence
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -79,17 +80,13 @@ func (d *spaceDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	}
 
 	key := config.Key.ValueString()
-	apiPath := fmt.Sprintf("/wiki/api/v2/spaces?keys=%s&limit=1", atlassian.QueryEscape(key))
-
-	var listResp struct {
-		Results []spaceV2Response `json:"results"`
-	}
-	if err := d.client.Get(ctx, apiPath, &listResp); err != nil {
+	r := &spaceResource{client: d.client}
+	space, statusCode, err := r.readSpaceV1(ctx, key)
+	if err != nil {
 		resp.Diagnostics.AddError("Error reading Confluence space", err.Error())
 		return
 	}
-
-	if len(listResp.Results) == 0 {
+	if statusCode == http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Confluence space not found",
 			fmt.Sprintf("No Confluence space found with key %q", key),
@@ -97,15 +94,10 @@ func (d *spaceDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 
-	space := listResp.Results[0]
 	config.ID = types.StringValue(space.ID.String())
 	config.Key = types.StringValue(space.Key)
 	config.Name = types.StringValue(space.Name)
-	if space.Description != nil {
-		config.Description = types.StringValue(space.Description.Value)
-	} else {
-		config.Description = types.StringValue("")
-	}
+	config.Description = types.StringValue(descriptionValue(space))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
 }
