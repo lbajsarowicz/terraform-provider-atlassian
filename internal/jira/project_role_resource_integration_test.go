@@ -163,7 +163,7 @@ func TestIntegrationProjectRoleActorResource_basic(t *testing.T) {
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testutil.ProtoV6ProviderFactories,
-		CheckDestroy:             testCheckProjectRoleActorProjectDestroyed(rKey),
+		CheckDestroy:             testCheckProjectRoleActorDestroyed,
 		Steps: []resource.TestStep{
 			{
 				Config: testIntegrationProjectRoleActorConfig(rKey, rName, leadAccountID),
@@ -230,29 +230,43 @@ func testCheckProjectRoleDestroyed(s *terraform.State) error {
 	return nil
 }
 
-// testCheckProjectRoleActorProjectDestroyed checks that the project used in the actor
-// test has been deleted (actors are destroyed when the project is deleted).
-func testCheckProjectRoleActorProjectDestroyed(projectKey string) func(*terraform.State) error {
-	return func(s *terraform.State) error {
-		client, err := testutil.SweepClient()
-		if err != nil {
-			return fmt.Errorf("creating client for destroy check: %w", err)
-		}
-		ctx := context.Background()
-
-		var result interface{}
-		statusCode, err := client.GetWithStatus(ctx,
-			fmt.Sprintf("/rest/api/3/project/%s", atlassian.PathEscape(projectKey)),
-			&result,
-		)
-		if err != nil {
-			return fmt.Errorf("error checking project %s destruction: %w", projectKey, err)
-		}
-		if statusCode != http.StatusNotFound {
-			return fmt.Errorf("project %s still exists (status %d)", projectKey, statusCode)
-		}
-		return nil
+// testCheckProjectRoleActorDestroyed verifies both the actor and the project are gone.
+func testCheckProjectRoleActorDestroyed(s *terraform.State) error {
+	client, err := testutil.SweepClient()
+	if err != nil {
+		return fmt.Errorf("creating client for destroy check: %w", err)
 	}
+	ctx := context.Background()
+
+	for _, rs := range s.RootModule().Resources {
+		if rs.Type == "atlassian_jira_project" {
+			var result interface{}
+			statusCode, err := client.GetWithStatus(ctx,
+				fmt.Sprintf("/rest/api/3/project/%s", atlassian.PathEscape(rs.Primary.Attributes["key"])),
+				&result,
+			)
+			if err != nil {
+				return fmt.Errorf("error checking project destruction: %w", err)
+			}
+			if statusCode != http.StatusNotFound {
+				return fmt.Errorf("project %s still exists (status %d)", rs.Primary.Attributes["key"], statusCode)
+			}
+		}
+		if rs.Type == "atlassian_jira_project_role" {
+			var result interface{}
+			statusCode, err := client.GetWithStatus(ctx,
+				fmt.Sprintf("/rest/api/3/role/%s", atlassian.PathEscape(rs.Primary.ID)),
+				&result,
+			)
+			if err != nil {
+				return fmt.Errorf("error checking project role destruction: %w", err)
+			}
+			if statusCode != http.StatusNotFound {
+				return fmt.Errorf("project role %s still exists (status %d)", rs.Primary.ID, statusCode)
+			}
+		}
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------
