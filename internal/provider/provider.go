@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/lbajsarowicz/terraform-provider-atlassian/internal/atlassian"
+	"github.com/lbajsarowicz/terraform-provider-atlassian/internal/confluence"
 	"github.com/lbajsarowicz/terraform-provider-atlassian/internal/jira"
 )
 
@@ -117,6 +118,8 @@ func (p *AtlassianProvider) Resources(_ context.Context) []func() resource.Resou
 		jira.NewScreenSchemeResource,
 		jira.NewIssueTypeScreenSchemeResource,
 		jira.NewProjectIssueTypeScreenSchemeResource,
+		confluence.NewSpaceResource,
+		confluence.NewSpacePermissionResource,
 	}
 }
 
@@ -135,5 +138,6 @@ func (p *AtlassianProvider) DataSources(_ context.Context) []func() datasource.D
 		jira.NewScreenDataSource,
 		jira.NewScreenSchemeDataSource,
 		jira.NewIssueTypeScreenSchemeDataSource,
+		confluence.NewSpaceDataSource,
 	}
 }
