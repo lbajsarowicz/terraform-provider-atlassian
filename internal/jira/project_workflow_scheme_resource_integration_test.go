@@ -64,6 +64,10 @@ resource "atlassian_jira_project" "test" {
   name             = %q
   project_type_key = "software"
   lead_account_id  = %q
+
+  # Ensure the project is destroyed before the workflow scheme.
+  # Jira returns 400 when deleting an active (assigned) scheme.
+  depends_on = [atlassian_jira_workflow_scheme.test]
 }
 
 resource "atlassian_jira_workflow_scheme" "test" {

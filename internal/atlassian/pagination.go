@@ -50,13 +50,19 @@ func (c *Client) GetAllPages(ctx context.Context, path string) ([]json.RawMessag
 			return allValues, nil
 		}
 
+		startAt += len(page.Values)
+
+		// Guard against APIs that report total correctly but lie about isLast:
+		// if we've fetched all items according to total, stop.
+		if page.Total > 0 && startAt >= page.Total {
+			return allValues, nil
+		}
+
 		// Guard against APIs that don't set isLast correctly:
 		// if we got fewer values than the page capacity, we've reached the end.
 		if page.MaxResults > 0 && len(page.Values) < page.MaxResults {
 			return allValues, nil
 		}
-
-		startAt += len(page.Values)
 	}
 
 	return nil, fmt.Errorf("pagination exceeded %d pages for %s", MaxPages, path)
