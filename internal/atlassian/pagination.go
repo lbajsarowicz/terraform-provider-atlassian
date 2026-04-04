@@ -44,15 +44,16 @@ func (c *Client) GetAllPages(ctx context.Context, path string) ([]json.RawMessag
 			return nil, fmt.Errorf("fetching page at startAt=%d: %w", startAt, err)
 		}
 
-		allValues = append(allValues, page.Values...)
-
-		if page.IsLast || len(page.Values) == 0 {
+		// Guard against APIs that ignore startAt and return the same page:
+		// if the response startAt doesn't match our request, stop paginating
+		// without appending the duplicate data.
+		if startAt > 0 && page.StartAt != startAt {
 			return allValues, nil
 		}
 
-		// Guard against APIs that ignore startAt and return the same page:
-		// if the response startAt doesn't match our request, stop paginating.
-		if startAt > 0 && page.StartAt != startAt {
+		allValues = append(allValues, page.Values...)
+
+		if page.IsLast || len(page.Values) == 0 {
 			return allValues, nil
 		}
 

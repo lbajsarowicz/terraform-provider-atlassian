@@ -323,9 +323,10 @@ func TestGetAllPagesStartAtMismatchStops(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
-	// First page (startAt=0 matches response), second page (startAt=50 != response 0 → stop).
-	if len(results) != 100 {
-		t.Fatalf("expected 100 results (2 pages), got %d", len(results))
+	// First page (startAt=0 matches), second request detects mismatch and
+	// discards the duplicate — only the first page's 50 items are returned.
+	if len(results) != 50 {
+		t.Fatalf("expected 50 results (1 page, duplicate discarded), got %d", len(results))
 	}
 	if requestCount.Load() != 2 {
 		t.Errorf("expected 2 requests, got %d", requestCount.Load())
