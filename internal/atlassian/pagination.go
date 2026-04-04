@@ -44,6 +44,12 @@ func (c *Client) GetAllPages(ctx context.Context, path string) ([]json.RawMessag
 			break
 		}
 
+		// Guard against APIs that don't set isLast correctly:
+		// if we got fewer values than the page capacity, we've reached the end.
+		if page.MaxResults > 0 && len(page.Values) < page.MaxResults {
+			break
+		}
+
 		startAt += len(page.Values)
 	}
 

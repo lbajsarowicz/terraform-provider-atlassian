@@ -40,10 +40,11 @@ func TestIntegrationProjectPermissionSchemeResource_basic(t *testing.T) {
 				),
 			},
 			{
-				ResourceName:      "atlassian_jira_project_permission_scheme.test",
-				ImportState:       true,
-				ImportStateId:     projectKey,
-				ImportStateVerify: true,
+				ResourceName:                         "atlassian_jira_project_permission_scheme.test",
+				ImportState:                          true,
+				ImportStateId:                        projectKey,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "project_key",
 			},
 		},
 	})

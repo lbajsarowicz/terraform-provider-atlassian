@@ -161,3 +161,44 @@ func TestGetAllPagesWithExistingQueryParams(t *testing.T) {
 		t.Fatalf("expected 0 results, got %d", len(results))
 	}
 }
+
+func TestGetAllPagesIsLastFalseButFewerThanMaxResults(t *testing.T) {
+	// Reproduces the bug where Jira returns isLast=false even when there
+	// are no more pages. Without the MaxResults guard this loops forever.
+	requestCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if requestCount > 2 {
+			t.Fatal("pagination did not terminate — infinite loop detected")
+		}
+		resp := PageResponse{
+			StartAt:    0,
+			MaxResults: 50,
+			Total:      1,
+			IsLast:     false, // API lies about isLast
+			Values:     []json.RawMessage{json.RawMessage(`{"id":"1"}`)},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientConfig{
+		URL:     server.URL,
+		User:    "user@example.com",
+		Token:   "token",
+		Version: "test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	results, err := client.GetAllPages(context.Background(), "/rest/api/3/items")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+}

@@ -14,10 +14,29 @@ concurrency:
 
 jobs:
   integration:
-    name: Integration
+    name: Integration (${{ matrix.name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     environment: integration
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Jira Core
+            package: ./internal/jira/...
+            pattern: "^TestIntegration(Group|IssueType[^S]|CustomField|Screen[^S])"
+          - name: Jira Schemes
+            package: ./internal/jira/...
+            pattern: "^TestIntegration(ScreenScheme|IssueTypeScheme|IssueTypeScreenScheme|PermissionScheme|Status)"
+          - name: Jira Projects
+            package: ./internal/jira/...
+            pattern: "^TestIntegration(Project|DataSource|_preflight)"
+          - name: Jira Workflows
+            package: ./internal/jira/...
+            pattern: "^TestIntegrationWorkflow"
+          - name: Confluence
+            package: ./internal/confluence/...
+            pattern: "^TestIntegration"
     steps:
       - uses: actions/checkout@v6
 
@@ -38,8 +57,8 @@ jobs:
       - name: Run integration tests
         env:
           TF_ACC: "1"
-        run: go test ./internal/jira/... -v -count=1 -timeout 30m -run '^TestIntegration'
+        run: go test ${{ matrix.package }} -v -count=1 -timeout 20m -run '${{ matrix.pattern }}'
 
       - name: Sweep stale resources
         if: always()
-        run: go test ./internal/jira/... -v -sweep=all -timeout 10m
+        run: go test ${{ matrix.package }} -v -sweep=all -timeout 10m
