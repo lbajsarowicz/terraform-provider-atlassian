@@ -1,5 +1,5 @@
 BINARY_NAME=terraform-provider-atlassian
-INSTALL_DIR=$(HOME)/.terraform.d/plugins/registry.opentofu.org/lbajsarowicz/atlassian/0.1.0/$$(go env GOOS)_$$(go env GOARCH)
+INSTALL_DIR=$(HOME)/.terraform.d/plugins/registry.terraform.io/lbajsarowicz/atlassian/0.1.0/$$(go env GOOS)_$$(go env GOARCH)
 
 .PHONY: build install test testacc lint clean testintegration sweep
 

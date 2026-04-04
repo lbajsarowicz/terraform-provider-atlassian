@@ -18,7 +18,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "registry.opentofu.org/lbajsarowicz/atlassian",
+		Address: "registry.terraform.io/lbajsarowicz/atlassian",
 		Debug:   debug,
 	}
 
