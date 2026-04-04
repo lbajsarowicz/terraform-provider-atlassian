@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.2](https://github.com/lbajsarowicz/terraform-provider-atlassian/compare/v0.1.1...v0.1.2) (2026-04-04)
+
+
+### Bug Fixes
+
+* add HTTP client resilience — response timeout, context-aware sleep, retry cap, pagination limit ([a347836](https://github.com/lbajsarowicz/terraform-provider-atlassian/commit/a3478365b77ab0fe7776758b9cfc50049c96f3c3))
+* check startAt mismatch before appending to avoid duplicate data ([824c70b](https://github.com/lbajsarowicz/terraform-provider-atlassian/commit/824c70b81072525e20902a3cd1385963dc30d665))
+* prevent cross-job sweeper interference and paginate workflow Read ([588f3c7](https://github.com/lbajsarowicz/terraform-provider-atlassian/commit/588f3c7881a348fc51d4139756953202fb802c17))
+* replace GetAllPages with direct Get for single-entry endpoints ([25390ce](https://github.com/lbajsarowicz/terraform-provider-atlassian/commit/25390ce192f5bbb5aac6d44ec0170ac8a9e31ff3))
+* replace GetAllPages with direct Get for single-entry endpoints ([e614c7f](https://github.com/lbajsarowicz/terraform-provider-atlassian/commit/e614c7fc5710f1b87ada94ed31f7cc15d6b8223f))
+* resolve integration test failures and parallelize CI ([520c4fe](https://github.com/lbajsarowicz/terraform-provider-atlassian/commit/520c4fedbef47c6be87edcf51c94ba4f0cdfffa5))
+* revert to default workflow scheme on Delete instead of no-op ([c1d161f](https://github.com/lbajsarowicz/terraform-provider-atlassian/commit/c1d161f4e658cabcac29bdcd5c0116bc71468567))
+* revert to default workflow scheme on Delete instead of no-op ([9470d90](https://github.com/lbajsarowicz/terraform-provider-atlassian/commit/9470d90e2090388b82840512b446bff73947c5bf))
+* use Total field to terminate pagination when isLast and maxResults checks fail ([f253859](https://github.com/lbajsarowicz/terraform-provider-atlassian/commit/f253859c12792af03d3016685d4f11e7562d227b))
+* use Total field to terminate pagination when isLast and maxResults checks fail ([1f492ae](https://github.com/lbajsarowicz/terraform-provider-atlassian/commit/1f492aed7e7bab0236e7de1290d7a45a1da9b52d))
+
 ## [0.1.1](https://github.com/lbajsarowicz/terraform-provider-atlassian/compare/v0.1.0...v0.1.1) (2026-04-04)
 
 
