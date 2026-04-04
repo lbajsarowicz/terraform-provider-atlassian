@@ -1,0 +1,26 @@
+---
+page_title: "{{.ProviderShortName}} Provider"
+subcategory: ""
+description: |-
+  The Atlassian provider manages Jira and Confluence Cloud resources.
+---
+
+# {{.ProviderShortName}} Provider
+
+The Atlassian provider enables managing [Atlassian Cloud](https://www.atlassian.com/cloud) (Jira + Confluence) resources as infrastructure as code.
+
+It supports Jira projects, permission schemes, workflows, issue types, custom fields, screens, and Confluence spaces — with full import and drift detection.
+
+## Authentication
+
+The provider requires three configuration values, each settable via provider config or environment variables:
+
+| Attribute | Env Var | Description |
+|-----------|---------|-------------|
+| `url` | `ATLASSIAN_URL` | Atlassian Cloud instance URL (e.g., `https://mysite.atlassian.net`) |
+| `user` | `ATLASSIAN_USER` | Account email for API auth |
+| `token` | `ATLASSIAN_TOKEN` | [API token](https://id.atlassian.com/manage-profile/security/api-tokens) |
+
+{{ tffile "examples/provider/provider.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
