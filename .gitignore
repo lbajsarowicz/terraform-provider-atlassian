@@ -39,3 +39,6 @@ override.tf.json
 # OS files
 .DS_Store
 Thumbs.db
+
+# Internal planning docs (removed from history)
+docs/superpowers/
