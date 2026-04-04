@@ -176,7 +176,7 @@ func (r *projectPermissionSchemeResource) Delete(ctx context.Context, req resour
 
 	// Tertiary heuristic: use the scheme with the lowest ID.
 	if defaultSchemeID == "" {
-		lowestID := math.MaxInt64
+		lowestID := math.MaxInt
 		for _, scheme := range listResult.PermissionSchemes {
 			if scheme.ID < lowestID {
 				lowestID = scheme.ID
