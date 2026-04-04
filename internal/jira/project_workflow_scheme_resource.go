@@ -154,8 +154,26 @@ func (r *projectWorkflowSchemeResource) Delete(ctx context.Context, req resource
 	}
 
 	// The Jira API does not support removing a workflow scheme association.
-	// On destroy, we perform a no-op (leave the project with its current scheme).
-	// This matches the behaviour described in the task spec.
+	// On destroy, revert the project to the default workflow scheme so that
+	// the custom scheme becomes inactive and can be deleted by Terraform.
+	const defaultWorkflowSchemeID = "10000"
+
+	body := map[string]string{
+		"workflowSchemeId": defaultWorkflowSchemeID,
+		"projectId":        state.ProjectID.ValueString(),
+	}
+
+	err := r.client.Put(ctx, "/rest/api/3/workflowscheme/project", body, nil)
+	if err != nil {
+		// Tolerate failure (e.g. project deleted out-of-band); emit a warning
+		// so Terraform can still clean up state.
+		resp.Diagnostics.AddWarning(
+			"Could not revert workflow scheme to default",
+			fmt.Sprintf("Error reverting project %q to the default workflow scheme: %s. "+
+				"The project may have been deleted or the scheme association was already removed.",
+				state.ProjectID.ValueString(), err.Error()),
+		)
+	}
 }
 
 func (r *projectWorkflowSchemeResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
