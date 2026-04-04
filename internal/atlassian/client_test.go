@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestNewClientWithEnvVars(t *testing.T) {
@@ -235,6 +236,141 @@ func TestQueryEscape(t *testing.T) {
 		if result != tt.expected {
 			t.Errorf("QueryEscape(%q) = %q, want %q", tt.input, result, tt.expected)
 		}
+	}
+}
+
+func TestResponseHeaderTimeoutFires(t *testing.T) {
+	blocked := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-blocked // never send headers
+	}))
+	defer func() {
+		close(blocked)
+		server.Close()
+	}()
+
+	client, err := NewClient(ClientConfig{
+		URL:                   server.URL,
+		User:                  "user@example.com",
+		Token:                 "token",
+		Version:               "test",
+		ResponseHeaderTimeout: 50 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	start := time.Now()
+	_, err = client.Do(context.Background(), "GET", "/test", nil)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected error from response header timeout, got nil")
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("expected fast timeout, took %v", elapsed)
+	}
+}
+
+func TestSleepWithContextAlreadyCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	start := time.Now()
+	err := sleepWithContext(ctx, 10*time.Second)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Error("expected context error, got nil")
+	}
+	if elapsed > 100*time.Millisecond {
+		t.Errorf("expected immediate return, took %v", elapsed)
+	}
+}
+
+func TestSleepWithContextCancelledDuringSleep(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	start := time.Now()
+	err := sleepWithContext(ctx, 10*time.Second)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Error("expected context error, got nil")
+	}
+	if elapsed > 500*time.Millisecond {
+		t.Errorf("expected early return, took %v", elapsed)
+	}
+}
+
+func TestParseRetryAfterCap(t *testing.T) {
+	tests := []struct {
+		header   string
+		wantMax  time.Duration
+		wantExact time.Duration
+	}{
+		{"600", 60 * time.Second, 60 * time.Second},  // 10 minutes → capped to 60s
+		{"3600", 60 * time.Second, 60 * time.Second}, // 1 hour → capped to 60s
+		{"30", 60 * time.Second, 30 * time.Second},   // within limit → unchanged
+		{"60", 60 * time.Second, 60 * time.Second},   // exactly at limit
+		{"0", 60 * time.Second, baseDelay},            // zero → baseDelay
+		{"", 60 * time.Second, baseDelay},             // empty → baseDelay
+		{"abc", 60 * time.Second, baseDelay},          // invalid → baseDelay
+	}
+
+	for _, tt := range tests {
+		d := parseRetryAfter(tt.header)
+		if d > tt.wantMax {
+			t.Errorf("parseRetryAfter(%q) = %v, exceeds max %v", tt.header, d, tt.wantMax)
+		}
+		if d != tt.wantExact {
+			t.Errorf("parseRetryAfter(%q) = %v, want %v", tt.header, d, tt.wantExact)
+		}
+	}
+}
+
+func TestDoContextCancelledDuringRetryWait(t *testing.T) {
+	var attempts atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts.Add(1)
+		w.Header().Set("Retry-After", "100") // 100s → capped to 60s → still cancelled quickly
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientConfig{
+		URL:     server.URL,
+		User:    "user@example.com",
+		Token:   "token",
+		Version: "test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	start := time.Now()
+	_, err = client.Do(ctx, "GET", "/test", nil)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected error from context cancellation, got nil")
+	}
+	if elapsed > 500*time.Millisecond {
+		t.Errorf("expected early return from context cancellation, took %v", elapsed)
+	}
+	if attempts.Load() != 1 {
+		t.Errorf("expected 1 attempt before cancellation, got %d", attempts.Load())
 	}
 }
 

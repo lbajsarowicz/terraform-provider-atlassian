@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -200,5 +202,48 @@ func TestGetAllPagesIsLastFalseButFewerThanMaxResults(t *testing.T) {
 
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+}
+
+func TestGetAllPagesMaxPagesExceeded(t *testing.T) {
+	// Server that always returns a full page with isLast=false,
+	// simulating an API that ignores startAt and loops indefinitely.
+	var requestCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount.Add(1)
+		values := make([]json.RawMessage, 50)
+		for i := range values {
+			values[i] = json.RawMessage(`{"id":"1"}`)
+		}
+		resp := PageResponse{
+			StartAt:    0,
+			MaxResults: 50,
+			IsLast:     false,
+			Values:     values,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientConfig{
+		URL:     server.URL,
+		User:    "user@example.com",
+		Token:   "token",
+		Version: "test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	_, err = client.GetAllPages(context.Background(), "/rest/api/3/items")
+	if err == nil {
+		t.Fatal("expected error when max pages exceeded, got nil")
+	}
+	if !strings.Contains(err.Error(), "exceeded") {
+		t.Errorf("expected 'exceeded' in error, got: %v", err)
+	}
+	if requestCount.Load() != int32(MaxPages) {
+		t.Errorf("expected %d requests, got %d", MaxPages, requestCount.Load())
 	}
 }

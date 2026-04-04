@@ -17,6 +17,12 @@ type PageResponse struct {
 	Values     []json.RawMessage `json:"values"`
 }
 
+// MaxPages is the maximum number of pages GetAllPages will fetch.
+// At 50 items per page this covers 5000 items — far beyond any real Jira instance.
+// An error is returned if this limit is exceeded, preventing infinite loops from
+// misbehaving APIs that always return isLast=false.
+const MaxPages = 100
+
 // GetAllPages fetches all pages from a Jira paginated endpoint.
 // The path should be the API path without pagination query parameters.
 // Results are returned as raw JSON messages that the caller can unmarshal.
@@ -25,7 +31,7 @@ func (c *Client) GetAllPages(ctx context.Context, path string) ([]json.RawMessag
 	startAt := 0
 	maxResults := 50
 
-	for {
+	for page := 0; page < MaxPages; page++ {
 		separator := "?"
 		if strings.Contains(path, "?") {
 			separator = "&"
@@ -41,19 +47,19 @@ func (c *Client) GetAllPages(ctx context.Context, path string) ([]json.RawMessag
 		allValues = append(allValues, page.Values...)
 
 		if page.IsLast || len(page.Values) == 0 {
-			break
+			return allValues, nil
 		}
 
 		// Guard against APIs that don't set isLast correctly:
 		// if we got fewer values than the page capacity, we've reached the end.
 		if page.MaxResults > 0 && len(page.Values) < page.MaxResults {
-			break
+			return allValues, nil
 		}
 
 		startAt += len(page.Values)
 	}
 
-	return allValues, nil
+	return nil, fmt.Errorf("pagination exceeded %d pages for %s", MaxPages, path)
 }
 
 // CursorPageResponse is the cursor-based pagination response used by Confluence v2 APIs.

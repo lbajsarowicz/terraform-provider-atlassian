@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	maxRetries    = 5
-	baseDelay     = 1 * time.Second
-	maxRetryDelay = 30 * time.Second
+	maxRetries           = 5
+	baseDelay            = 1 * time.Second
+	maxRetryDelay        = 30 * time.Second
+	maxRetryAfterSeconds = 60
 )
 
 // Client is the Atlassian Cloud API client.
@@ -37,6 +38,9 @@ type ClientConfig struct {
 	User    string
 	Token   string
 	Version string
+	// ResponseHeaderTimeout is how long to wait for response headers before
+	// cancelling the request. Defaults to 30s. Set a shorter value in tests.
+	ResponseHeaderTimeout time.Duration
 }
 
 // NewClient creates a new Atlassian API client.
@@ -69,12 +73,23 @@ func NewClient(config ClientConfig) (*Client, error) {
 
 	baseURL := strings.TrimRight(u, "/")
 
+	responseHeaderTimeout := 30 * time.Second
+	if config.ResponseHeaderTimeout > 0 {
+		responseHeaderTimeout = config.ResponseHeaderTimeout
+	}
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = responseHeaderTimeout
+
 	return &Client{
-		baseURL:    baseURL,
-		user:       user,
-		token:      token,
-		version:    config.Version,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		baseURL: baseURL,
+		user:    user,
+		token:   token,
+		version: config.Version,
+		httpClient: &http.Client{
+			Timeout:   30 * time.Second,
+			Transport: transport,
+		},
 	}, nil
 }
 
@@ -151,7 +166,9 @@ func (c *Client) Do(ctx context.Context, method, path string, body []byte) (*htt
 				return nil, fmt.Errorf("rate limited after %d retries", maxRetries)
 			}
 			delay := parseRetryAfter(resp.Header.Get("Retry-After"))
-			time.Sleep(delay)
+			if err := sleepWithContext(ctx, delay); err != nil {
+				return nil, err
+			}
 			continue
 		}
 
@@ -162,7 +179,9 @@ func (c *Client) Do(ctx context.Context, method, path string, body []byte) (*htt
 				return nil, fmt.Errorf("server error (HTTP %d) after %d retries", resp.StatusCode, maxRetries)
 			}
 			delay := exponentialBackoff(attempt)
-			time.Sleep(delay)
+			if err := sleepWithContext(ctx, delay); err != nil {
+				return nil, err
+			}
 			continue
 		}
 
@@ -327,17 +346,35 @@ func (c *Client) DeleteWithStatus(ctx context.Context, path string) (int, error)
 
 // parseRetryAfter parses the Retry-After header value as seconds.
 // Returns baseDelay if the header cannot be parsed.
+// Caps the value at maxRetryAfterSeconds to prevent multi-minute sleeps.
 func parseRetryAfter(header string) time.Duration {
 	if header == "" {
 		return baseDelay
 	}
 
 	seconds, err := strconv.Atoi(header)
-	if err != nil {
+	if err != nil || seconds <= 0 {
 		return baseDelay
 	}
 
+	if seconds > maxRetryAfterSeconds {
+		seconds = maxRetryAfterSeconds
+	}
+
 	return time.Duration(seconds) * time.Second
+}
+
+// sleepWithContext sleeps for d or until ctx is cancelled, whichever comes first.
+// Returns ctx.Err() if the context is cancelled before the sleep completes.
+func sleepWithContext(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // exponentialBackoff calculates the delay for a given retry attempt with jitter
