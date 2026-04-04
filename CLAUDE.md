@@ -12,8 +12,14 @@ Provide a production-grade OpenTofu provider that enables declarative management
 - **Framework:** `hashicorp/terraform-plugin-framework` (NOT legacy SDK v2)
 - **API:** Jira Cloud REST API v3 + Confluence Cloud REST API v2
 - **Auth:** Basic auth (email:api-token), env vars `ATLASSIAN_URL`, `ATLASSIAN_USER`, `ATLASSIAN_TOKEN`
-- **Registry:** `registry.opentofu.org/lbajsarowicz/atlassian`
+- **Registry:** `registry.terraform.io/lbajsarowicz/atlassian` (published to Terraform Registry; OpenTofu consumes it natively)
 - **License:** GPL-3.0-or-later
+
+## Key Decisions
+
+- **Dual-registry publishing:** Published to Terraform Registry (`registry.terraform.io/lbajsarowicz/atlassian`); OpenTofu consumes Terraform Registry providers natively, so no separate OpenTofu Registry publish is required
+- **Release Please** (`googleapis/release-please-action@v4`): Automated versioning and changelog generation from conventional commits; creates release PRs automatically
+- **GoReleaser v2:** Cross-compilation for all target platforms, GPG signing of release artifacts, and GitHub Release publishing on tag push
 
 ## Key Conventions
 
