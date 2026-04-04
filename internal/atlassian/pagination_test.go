@@ -205,6 +205,89 @@ func TestGetAllPagesIsLastFalseButFewerThanMaxResults(t *testing.T) {
 	}
 }
 
+func TestGetAllPagesIsLastFalseMaxResultsEqualsValues(t *testing.T) {
+	// Reproduces the real Jira bug: workflowscheme/project returns
+	// isLast=false, maxResults=1, and 1 value — all three termination
+	// conditions fail and the loop runs until MaxPages.
+	var requestCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount.Add(1)
+		if requestCount.Load() > 3 {
+			t.Fatal("pagination did not terminate — infinite loop detected")
+		}
+		resp := PageResponse{
+			StartAt:    0,
+			MaxResults: 1,
+			Total:      1,
+			IsLast:     false, // API lies about isLast
+			Values:     []json.RawMessage{json.RawMessage(`{"id":"1"}`)},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientConfig{
+		URL:     server.URL,
+		User:    "user@example.com",
+		Token:   "token",
+		Version: "test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	results, err := client.GetAllPages(context.Background(), "/rest/api/3/items")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+}
+
+func TestGetAllPagesMaxResultsZeroStopsOnTotal(t *testing.T) {
+	// API returns maxResults=0 (some Jira endpoints do this),
+	// but Total is set correctly. Should still terminate.
+	var requestCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount.Add(1)
+		if requestCount.Load() > 3 {
+			t.Fatal("pagination did not terminate — infinite loop detected")
+		}
+		resp := PageResponse{
+			StartAt:    0,
+			MaxResults: 0,
+			Total:      2,
+			IsLast:     false,
+			Values:     []json.RawMessage{json.RawMessage(`{"id":"1"}`), json.RawMessage(`{"id":"2"}`)},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientConfig{
+		URL:     server.URL,
+		User:    "user@example.com",
+		Token:   "token",
+		Version: "test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	results, err := client.GetAllPages(context.Background(), "/rest/api/3/items")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+}
+
 func TestGetAllPagesMaxPagesExceeded(t *testing.T) {
 	// Server that always returns a full page with isLast=false,
 	// simulating an API that ignores startAt and loops indefinitely.
