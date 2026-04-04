@@ -113,13 +113,14 @@ func (r *projectWorkflowSchemeResource) Read(ctx context.Context, req resource.R
 	projectID := state.ProjectID.ValueString()
 	apiPath := fmt.Sprintf("/rest/api/3/workflowscheme/project?projectId=%s", atlassian.QueryEscape(projectID))
 
-	allValues, err := r.client.GetAllPages(ctx, apiPath)
-	if err != nil {
+	// This endpoint returns at most one entry per project — no pagination needed.
+	var page atlassian.PageResponse
+	if err := r.client.Get(ctx, apiPath, &page); err != nil {
 		resp.Diagnostics.AddError("Error reading project workflow scheme", err.Error())
 		return
 	}
 
-	for _, raw := range allValues {
+	for _, raw := range page.Values {
 		var entry projectWorkflowSchemeListEntry
 		if err := json.Unmarshal(raw, &entry); err != nil {
 			resp.Diagnostics.AddError("Error parsing project workflow scheme response", err.Error())
@@ -162,13 +163,14 @@ func (r *projectWorkflowSchemeResource) ImportState(ctx context.Context, req res
 
 	apiPath := fmt.Sprintf("/rest/api/3/workflowscheme/project?projectId=%s", atlassian.QueryEscape(projectID))
 
-	allValues, err := r.client.GetAllPages(ctx, apiPath)
-	if err != nil {
+	// This endpoint returns at most one entry per project — no pagination needed.
+	var page atlassian.PageResponse
+	if err := r.client.Get(ctx, apiPath, &page); err != nil {
 		resp.Diagnostics.AddError("Error importing project workflow scheme", err.Error())
 		return
 	}
 
-	if len(allValues) == 0 {
+	if len(page.Values) == 0 {
 		resp.Diagnostics.AddError(
 			"Project workflow scheme not found",
 			fmt.Sprintf("No workflow scheme association found for project ID %q", projectID),
@@ -177,7 +179,7 @@ func (r *projectWorkflowSchemeResource) ImportState(ctx context.Context, req res
 	}
 
 	var entry projectWorkflowSchemeListEntry
-	if err := json.Unmarshal(allValues[0], &entry); err != nil {
+	if err := json.Unmarshal(page.Values[0], &entry); err != nil {
 		resp.Diagnostics.AddError("Error parsing project workflow scheme response", err.Error())
 		return
 	}
