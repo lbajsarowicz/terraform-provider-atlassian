@@ -16,7 +16,7 @@ func TestIntegrationProjectIssueTypeSchemeResource_basic(t *testing.T) {
 	testutil.SkipIfNoAcc(t)
 
 	rName := acctest.RandomWithPrefix("tf-acc-test")
-	projectKey := fmt.Sprintf("TFACC%s", acctest.RandStringFromCharSet(6, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+	projectKey := fmt.Sprintf("TFACC%s", acctest.RandStringFromCharSet(5, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
 
 	client, err := testutil.SweepClient()
 	if err != nil {
@@ -66,16 +66,23 @@ resource "atlassian_jira_project" "test" {
   lead_account_id  = %q
 }
 
-resource "atlassian_jira_issue_type_scheme" "test" {
+resource "atlassian_jira_issue_type" "its_dep" {
   name        = %q
-  description = "Integration test (run %s)"
+  description = "Integration test issue type (run %s)"
+  type        = "standard"
+}
+
+resource "atlassian_jira_issue_type_scheme" "test" {
+  name           = %q
+  description    = "Integration test (run %s)"
+  issue_type_ids = [atlassian_jira_issue_type.its_dep.id]
 }
 
 resource "atlassian_jira_project_issue_type_scheme" "test" {
   project_id           = atlassian_jira_project.test.id
   issue_type_scheme_id = atlassian_jira_issue_type_scheme.test.id
 }
-`, projectKey, name, leadAccountID, name+"-its", testutil.RunID())
+`, projectKey, name, leadAccountID, name+"-it", testutil.RunID(), name+"-its", testutil.RunID())
 }
 
 func testCheckProjectIssueTypeSchemeReverted(s *terraform.State) error {

@@ -17,7 +17,7 @@ func TestIntegrationProjectPermissionSchemeResource_basic(t *testing.T) {
 	testutil.SkipIfNoAcc(t)
 
 	rName := acctest.RandomWithPrefix("tf-acc-test")
-	projectKey := fmt.Sprintf("TFACC%s", acctest.RandStringFromCharSet(6, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+	projectKey := fmt.Sprintf("TFACC%s", acctest.RandStringFromCharSet(5, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
 
 	client, err := testutil.SweepClient()
 	if err != nil {
