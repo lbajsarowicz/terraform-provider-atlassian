@@ -7,6 +7,8 @@
 
 Terraform/OpenTofu provider for managing [Atlassian Cloud](https://www.atlassian.com/cloud) (Jira + Confluence) configuration as infrastructure as code. Supports projects, permission schemes, workflows, issue types, custom fields, screens, roles, and Confluence spaces — with full import and drift detection.
 
+**[View on Terraform Registry](https://registry.terraform.io/providers/lbajsarowicz/atlassian/latest)** — full documentation, installation instructions, and version history.
+
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0 or [OpenTofu](https://opentofu.org/docs/intro/install/) >= 1.6
