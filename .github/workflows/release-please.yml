@@ -14,14 +14,16 @@ jobs:
     name: Release Please
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/create-github-app-token@v3
-        id: app-token
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
         with:
-          app-id: ${{ vars.RELEASE_APP_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          RELEASE_TOKEN: op://terraform-provider-atlassian/terraform-atlassian-release-token/token
 
       - uses: googleapis/release-please-action@v4
         with:
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ env.RELEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
