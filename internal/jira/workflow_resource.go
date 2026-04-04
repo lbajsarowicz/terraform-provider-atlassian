@@ -2,6 +2,7 @@ package jira
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -198,35 +199,10 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	// When importing by ID, state.Name may be empty. In that case search without
-	// a name filter so we can locate the workflow by entity ID across the results.
-	var apiPath string
-	if state.Name.ValueString() != "" {
-		apiPath = fmt.Sprintf("/rest/api/3/workflow/search?workflowName=%s&expand=statuses",
-			atlassian.QueryEscape(state.Name.ValueString()))
-	} else {
-		apiPath = "/rest/api/3/workflow/search?expand=statuses"
-	}
-
-	var searchResp workflowSearchResponse
-	statusCode, err := r.client.GetWithStatus(ctx, apiPath, &searchResp)
+	found, err := r.findWorkflowByID(ctx, state.ID.ValueString(), state.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading workflow", err.Error())
 		return
-	}
-
-	if statusCode == http.StatusNotFound {
-		resp.State.RemoveResource(ctx)
-		return
-	}
-
-	// Find the workflow by entity ID
-	var found *workflowAPIItem
-	for i := range searchResp.Values {
-		if searchResp.Values[i].ID.EntityID == state.ID.ValueString() {
-			found = &searchResp.Values[i]
-			break
-		}
 	}
 
 	if found == nil {
@@ -255,6 +231,36 @@ func (r *workflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 	state.Statuses = statusList
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
+// findWorkflowByID paginates the workflow search endpoint and returns the
+// workflow matching the given entity ID, or nil if not found.
+func (r *workflowResource) findWorkflowByID(ctx context.Context, entityID, name string) (*workflowAPIItem, error) {
+	// When the name is known, filter by it to reduce result set.
+	var apiPath string
+	if name != "" {
+		apiPath = fmt.Sprintf("/rest/api/3/workflow/search?workflowName=%s&expand=statuses",
+			atlassian.QueryEscape(name))
+	} else {
+		apiPath = "/rest/api/3/workflow/search?expand=statuses"
+	}
+
+	allValues, err := r.client.GetAllPages(ctx, apiPath)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, raw := range allValues {
+		var item workflowAPIItem
+		if err := json.Unmarshal(raw, &item); err != nil {
+			return nil, fmt.Errorf("unmarshaling workflow: %w", err)
+		}
+		if item.ID.EntityID == entityID {
+			return &item, nil
+		}
+	}
+
+	return nil, nil
 }
 
 func (r *workflowResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {

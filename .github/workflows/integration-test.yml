@@ -59,6 +59,34 @@ jobs:
           TF_ACC: "1"
         run: go test ${{ matrix.package }} -v -count=1 -timeout 20m -run '${{ matrix.pattern }}'
 
-      - name: Sweep stale resources
-        if: always()
-        run: go test ${{ matrix.package }} -v -sweep=all -timeout 10m
+  # Run sweepers only after ALL integration jobs complete to avoid deleting
+  # resources that parallel matrix jobs are still using.
+  cleanup:
+    name: Sweep stale resources
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: integration
+    needs: [integration]
+    if: always()
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          ATLASSIAN_URL: op://terraform-provider-atlassian/atlassian-api-token/url
+          ATLASSIAN_USER: op://terraform-provider-atlassian/atlassian-api-token/email
+          ATLASSIAN_TOKEN: op://terraform-provider-atlassian/atlassian-api-token/api-token
+
+      - name: Sweep Jira resources
+        run: go test ./internal/jira/... -v -sweep=all -timeout 10m
+
+      - name: Sweep Confluence resources
+        run: go test ./internal/confluence/... -v -sweep=all -timeout 10m
