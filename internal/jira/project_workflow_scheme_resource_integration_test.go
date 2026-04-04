@@ -99,11 +99,13 @@ func testCheckProjectWorkflowSchemeStillAssigned(s *terraform.State) error {
 			continue
 		}
 
-		allValues, err := client.GetAllPages(ctx, fmt.Sprintf("/rest/api/3/workflowscheme/project?projectId=%s", projectID))
-		if err != nil {
+		var page struct {
+			Values []json.RawMessage `json:"values"`
+		}
+		if err := client.Get(ctx, fmt.Sprintf("/rest/api/3/workflowscheme/project?projectId=%s", projectID), &page); err != nil {
 			return fmt.Errorf("listing workflow scheme for project %s: %w", projectID, err)
 		}
-		if len(allValues) == 0 {
+		if len(page.Values) == 0 {
 			// Delete is documented as a no-op — the association must still exist.
 			return fmt.Errorf("workflow scheme association missing for project %s after destroy (expected no-op)", projectID)
 		}
@@ -112,7 +114,7 @@ func testCheckProjectWorkflowSchemeStillAssigned(s *terraform.State) error {
 				ID int64 `json:"id"`
 			} `json:"workflowScheme"`
 		}
-		if err := json.Unmarshal(allValues[0], &entry); err != nil {
+		if err := json.Unmarshal(page.Values[0], &entry); err != nil {
 			return fmt.Errorf("parsing workflow scheme association: %w", err)
 		}
 		if entry.WorkflowScheme.ID == 0 {

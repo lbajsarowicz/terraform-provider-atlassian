@@ -50,6 +50,12 @@ func (c *Client) GetAllPages(ctx context.Context, path string) ([]json.RawMessag
 			return allValues, nil
 		}
 
+		// Guard against APIs that ignore startAt and return the same page:
+		// if the response startAt doesn't match our request, stop paginating.
+		if startAt > 0 && page.StartAt != startAt {
+			return allValues, nil
+		}
+
 		startAt += len(page.Values)
 
 		// Guard against APIs that report total correctly but lie about isLast:

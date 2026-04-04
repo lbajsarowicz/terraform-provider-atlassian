@@ -288,9 +288,9 @@ func TestGetAllPagesMaxResultsZeroStopsOnTotal(t *testing.T) {
 	}
 }
 
-func TestGetAllPagesMaxPagesExceeded(t *testing.T) {
-	// Server that always returns a full page with isLast=false,
-	// simulating an API that ignores startAt and loops indefinitely.
+func TestGetAllPagesStartAtMismatchStops(t *testing.T) {
+	// Server that ignores startAt and always returns startAt=0.
+	// The startAt mismatch guard should terminate after 2 requests.
 	var requestCount atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount.Add(1)
@@ -299,7 +299,55 @@ func TestGetAllPagesMaxPagesExceeded(t *testing.T) {
 			values[i] = json.RawMessage(`{"id":"1"}`)
 		}
 		resp := PageResponse{
-			StartAt:    0,
+			StartAt:    0, // always 0, ignoring our startAt param
+			MaxResults: 50,
+			IsLast:     false,
+			Values:     values,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(ClientConfig{
+		URL:     server.URL,
+		User:    "user@example.com",
+		Token:   "token",
+		Version: "test",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	results, err := client.GetAllPages(context.Background(), "/rest/api/3/items")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	// First page (startAt=0 matches response), second page (startAt=50 != response 0 → stop).
+	if len(results) != 100 {
+		t.Fatalf("expected 100 results (2 pages), got %d", len(results))
+	}
+	if requestCount.Load() != 2 {
+		t.Errorf("expected 2 requests, got %d", requestCount.Load())
+	}
+}
+
+func TestGetAllPagesMaxPagesExceeded(t *testing.T) {
+	// Server that echoes startAt correctly but never sets isLast=true,
+	// simulating an API with genuinely infinite pages.
+	var requestCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount.Add(1)
+		query := r.URL.Query()
+		reqStartAt := 0
+		fmt.Sscanf(query.Get("startAt"), "%d", &reqStartAt)
+
+		values := make([]json.RawMessage, 50)
+		for i := range values {
+			values[i] = json.RawMessage(`{"id":"1"}`)
+		}
+		resp := PageResponse{
+			StartAt:    reqStartAt, // echo back correctly
 			MaxResults: 50,
 			IsLast:     false,
 			Values:     values,
