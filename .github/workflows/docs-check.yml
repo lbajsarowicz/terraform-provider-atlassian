@@ -1,0 +1,57 @@
+name: Docs Check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Verify Generated Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Install tfplugindocs
+        run: go install github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@v0.24.0
+
+      - name: Build provider
+        run: go build -o terraform-provider-atlassian
+
+      - name: Generate schema
+        run: |
+          mkdir -p /tmp/tf-schema
+          cd /tmp/tf-schema
+          cat > main.tf <<'EOF'
+          terraform {
+            required_providers {
+              atlassian = {
+                source = "registry.terraform.io/lbajsarowicz/atlassian"
+              }
+            }
+          }
+          EOF
+          terraform init -plugin-dir="${GITHUB_WORKSPACE}" || true
+          terraform providers schema -json > schema.json
+
+      - name: Generate docs
+        run: tfplugindocs generate --providers-schema=/tmp/tf-schema/schema.json
+        working-directory: ${{ github.workspace }}
+
+      - name: Check for diff
+        run: |
+          if ! git diff --exit-code docs/; then
+            echo "::error::Generated docs are out of date. Run 'tfplugindocs generate' and commit the changes."
+            git diff docs/
+            exit 1
+          fi
